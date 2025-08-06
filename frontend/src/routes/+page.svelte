@@ -34,9 +34,15 @@
 
 	onMount(async () => {
 		try {
-			const response = await fetch('/api/test-reddit');
+			const response = await fetch('/api/mixed-comments');
 			if (!response.ok) throw new Error('Failed to fetch');
-			redditData = await response.json();
+			const data = await response.json();
+			
+			if (data.error) {
+				error = data.error;
+			} else {
+				redditData = data;
+			}
 		} catch (err) {
 			error = 'Failed to load Reddit data';
 			console.error(err);
@@ -94,16 +100,26 @@
 							<div class="comment mb-4" style="margin-left: {flatComment.depth * 20}px">
 								<div class="border-l-2 border-gray-600 pl-4">
 									<div class="text-sm text-gray-400 mb-2">
-										<span class="font-medium text-blue-400">u/{flatComment.author}</span>
+										<span class="font-medium" class:text-red-400={flatComment.is_ai} class:text-blue-400={!flatComment.is_ai}>
+											u/{flatComment.author}
+										</span>
 										<span class="ml-2">{flatComment.score} points</span>
 										{#if flatComment.is_ai}
-											<span class="ml-2 text-xs bg-purple-600 text-purple-100 px-2 py-1 rounded">AI</span>
+											<span class="ml-2 text-xs bg-red-600 text-red-100 px-2 py-1 rounded">AI</span>
 										{/if}
 									</div>
 									{#if flatComment.content_html}
-										<div class="text-gray-200 mb-3 prose prose-invert prose-sm max-w-none">{@html flatComment.content_html}</div>
+										<div class="mb-3 prose prose-invert prose-sm max-w-none" 
+											 class:text-red-300={flatComment.is_ai} 
+											 class:text-gray-200={!flatComment.is_ai}>
+											{@html flatComment.content_html}
+										</div>
 									{:else}
-										<div class="text-gray-200 mb-3 whitespace-pre-wrap">{flatComment.content}</div>
+										<div class="mb-3 whitespace-pre-wrap" 
+											 class:text-red-300={flatComment.is_ai} 
+											 class:text-gray-200={!flatComment.is_ai}>
+											{flatComment.content}
+										</div>
 									{/if}
 								</div>
 							</div>

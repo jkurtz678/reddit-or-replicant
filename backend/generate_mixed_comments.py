@@ -203,7 +203,7 @@ def main():
         return
     
     # Calculate how many AI comments to generate
-    ai_percentage = 0.2  # 20%
+    ai_percentage = 0.5  # 50%
     num_ai_comments = int(len(real_comments) * ai_percentage)
     
     if num_ai_comments == 0:
