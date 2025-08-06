@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 import json
 import os
 import httpx
+from reddit_parser import parse_reddit_json
 
 app = FastAPI()
 
@@ -17,6 +18,17 @@ def get_posts():
 
 @app.get("/api/test-reddit")
 def get_test_reddit():
+    json_file_path = os.path.join(os.path.dirname(__file__), "test-reddit.json")
+    with open(json_file_path, "r") as file:
+        raw_data = json.load(file)
+    
+    # Parse into clean nested structure
+    parsed_data = parse_reddit_json(raw_data)
+    return parsed_data
+
+@app.get("/api/test-reddit-raw")
+def get_test_reddit_raw():
+    """Keep the raw endpoint for debugging"""
     json_file_path = os.path.join(os.path.dirname(__file__), "test-reddit.json")
     with open(json_file_path, "r") as file:
         data = json.load(file)

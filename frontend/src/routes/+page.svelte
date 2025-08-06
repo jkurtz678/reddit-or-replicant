@@ -1,7 +1,34 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	let redditData: any = null;
+	interface Post {
+		id: string;
+		title: string;
+		content: string;
+		author: string;
+		subreddit: string;
+		score: number;
+		comment_count: number;
+	}
+
+	interface Comment {
+		id: string;
+		author: string;
+		content: string;
+		content_html: string | null;
+		score: number;
+		depth: number;
+		parent_id: string | null;
+		replies: Comment[];
+		is_ai: boolean;
+	}
+
+	interface RedditData {
+		post: Post;
+		comments: Comment[];
+	}
+
+	let redditData: RedditData | null = null;
 	let loading = true;
 	let error = '';
 
@@ -18,47 +45,14 @@
 		}
 	});
 
-	function renderComment(comment: any, depth = 0): any {
-		if (!comment || !comment.data) return null;
-		
-		const replies = comment.data.replies && typeof comment.data.replies === 'object' && comment.data.replies.data?.children
-			? comment.data.replies.data.children
-				.filter((child: any) => child.kind === 't1')
-				.map((reply: any) => renderComment(reply, depth + 1))
-				.filter(Boolean)
-			: [];
-
-		return {
-			...comment.data,
-			depth,
-			replies
-		};
-	}
-
-	function getCommentsTree(comments: any[]) {
-		if (!comments) return [];
-		return comments
-			.filter(comment => comment.kind === 't1')
-			.map(comment => renderComment(comment, 0))
-			.filter(Boolean);
-	}
-
-	function getAllComments(comment: any, allComments: any[] = []): any[] {
-		if (!comment) return allComments;
-		
+	function getAllComments(comment: Comment, allComments: Comment[] = []): Comment[] {
 		allComments.push(comment);
 		if (comment.replies && comment.replies.length > 0) {
-			comment.replies.forEach((reply: any) => {
+			comment.replies.forEach((reply: Comment) => {
 				getAllComments(reply, allComments);
 			});
 		}
 		return allComments;
-	}
-
-	function decodeHtml(html: string): string {
-		const txt = document.createElement('textarea');
-		txt.innerHTML = html;
-		return txt.value;
 	}
 </script>
 
@@ -72,32 +66,28 @@
 	</div>
 {:else if redditData}
 	<div class="max-w-4xl mx-auto bg-white">
-		<!-- Post (first listing) -->
-		{#if redditData[0]?.kind === 'Listing' && redditData[0].data.children}
-			{#each redditData[0].data.children as item}
-				{#if item.kind === 't3'}
-					<div class="border-b border-gray-200 p-6">
-						<div class="mb-4">
-							<span class="text-sm text-gray-500">r/{item.data.subreddit}</span>
-							<span class="text-sm text-gray-400 ml-2">• Posted by u/{item.data.author}</span>
-						</div>
-						<h1 class="text-2xl font-bold mb-4">{item.data.title}</h1>
-						{#if item.data.selftext}
-							<div class="text-gray-800 mb-4 whitespace-pre-wrap">{item.data.selftext}</div>
-						{/if}
-						<div class="text-sm text-gray-500">
-							{item.data.score} points • {item.data.num_comments} comments
-						</div>
-					</div>
+		<!-- Post -->
+		{#if redditData.post}
+			<div class="border-b border-gray-200 p-6">
+				<div class="mb-4">
+					<span class="text-sm text-gray-500">r/{redditData.post.subreddit}</span>
+					<span class="text-sm text-gray-400 ml-2">• Posted by u/{redditData.post.author}</span>
+				</div>
+				<h1 class="text-2xl font-bold mb-4">{redditData.post.title}</h1>
+				{#if redditData.post.content}
+					<div class="text-gray-800 mb-4 whitespace-pre-wrap">{redditData.post.content}</div>
 				{/if}
-			{/each}
+				<div class="text-sm text-gray-500">
+					{redditData.post.score} points • {redditData.post.comment_count} comments
+				</div>
+			</div>
 		{/if}
 
-		<!-- Comments (second listing) -->
-		{#if redditData[1]?.kind === 'Listing' && redditData[1].data.children}
+		<!-- Comments -->
+		{#if redditData.comments && redditData.comments.length > 0}
 			<div class="p-6">
 				<h2 class="text-lg font-semibold mb-4">Comments</h2>
-				{#each getCommentsTree(redditData[1].data.children) as comment}
+				{#each redditData.comments as comment}
 					{@const allComments = getAllComments(comment)}
 					{#each allComments as flatComment}
 						<div class="comment mb-4" style="margin-left: {flatComment.depth * 20}px">
@@ -105,8 +95,15 @@
 								<div class="text-sm text-gray-600 mb-2">
 									<span class="font-medium">u/{flatComment.author}</span>
 									<span class="ml-2">{flatComment.score} points</span>
+									{#if flatComment.is_ai}
+										<span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">AI</span>
+									{/if}
 								</div>
-								<div class="text-gray-800 mb-3">{@html decodeHtml(flatComment.body_html)}</div>
+								{#if flatComment.content_html}
+									<div class="text-gray-800 mb-3">{@html flatComment.content_html}</div>
+								{:else}
+									<div class="text-gray-800 mb-3 whitespace-pre-wrap">{flatComment.content}</div>
+								{/if}
 							</div>
 						</div>
 					{/each}
