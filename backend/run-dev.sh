@@ -1,2 +1,2 @@
 #!/bin/bash
-uv run uvicorn hello:app --reload
+uv run uvicorn server:app --reload

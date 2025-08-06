@@ -34,6 +34,17 @@ def get_test_reddit_raw():
         data = json.load(file)
     return data
 
+@app.get("/api/mixed-comments")
+def get_mixed_comments():
+    """Get the mixed real + AI comments"""
+    json_file_path = os.path.join(os.path.dirname(__file__), "mixed-comments.json")
+    try:
+        with open(json_file_path, "r") as file:
+            data = json.load(file)
+        return data
+    except FileNotFoundError:
+        return {"error": "mixed-comments.json not found. Run generate_mixed_comments.py first."}
+
 # Proxy all other requests to SvelteKit dev server
 @app.get("/{full_path:path}")
 async def proxy_to_frontend(full_path: str, request: Request):
