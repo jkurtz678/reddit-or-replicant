@@ -43,6 +43,10 @@ def create_generation_prompt(post_title: str, post_content: str, subreddit: str,
         for comment in sample_comments
     ])
     
+    # Extract just the usernames for examples
+    real_usernames = [comment.author for comment in sample_comments]
+    username_examples = ", ".join(real_usernames)
+    
     prompt = f"""You are generating realistic Reddit comments for r/{subreddit}. 
 
 POST TITLE: {post_title}
@@ -52,22 +56,33 @@ POST CONTENT: {post_content}
 EXAMPLES OF REAL COMMENTS FROM THIS THREAD:
 {examples}
 
-Generate {num_to_generate} realistic Reddit comments that would naturally appear in this thread. Each comment should:
+Generate {num_to_generate} realistic Reddit comments that would naturally appear in this thread.
 
-1. Feel authentic and human-written (including typos, casual language, Reddit slang)
-2. Be relevant to the original post
-3. Vary in length (some short reactions, some longer responses)
-4. Include different personality types (helpful, funny, sharing experiences, etc.)
-5. Use realistic Reddit usernames (like the real examples above)
-6. Sound like they're from different people with different writing styles
+CRITICAL REQUIREMENTS:
 
-Format your response as a JSON array where each comment has:
-- "username": a realistic Reddit username
-- "content": the comment text (keep original post formatting, use natural language)
+USERNAMES: Create completely generic, unrelated usernames like the real ones above ({username_examples}). 
+- DO NOT make usernames relate to the post topic or content
+- Use random combinations like: numbers, random words, gaming terms, etc.
+- Examples of good generic usernames: mikejones234, xXgamerXx, throwaway_acc, techbro99
 
-DO NOT include scores, timestamps, or metadata - just username and content.
+COMMENT STYLE: Write like real humans, not like you're trying to sound like Reddit:
+- Don't force slang or try too hard to sound casual - be naturally conversational
+- Don't be overly helpful or informative - mix in casual reactions too
+- Some people just leave short reactions, others tell stories
+- Natural writing but don't overdo typos or internet speak
+- Avoid sounding like an expert giving advice unless it fits naturally
 
-Make these indistinguishable from real human comments. Vary the tone, length, and style significantly.
+Vary between:
+- Quick reactions ("oh no", "that sucks", "been there")  
+- Personal anecdotes (brief, natural)
+- Casual sympathy/humor
+- Sometimes just acknowledgment
+
+Format as JSON array:
+- "username": generic Reddit username (NOT topic-related)
+- "content": natural human comment
+
+Make these truly indistinguishable from real humans. Focus on sounding natural rather than "Reddit-y".
 """
     
     return prompt
