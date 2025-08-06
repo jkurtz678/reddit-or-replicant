@@ -56,59 +56,61 @@
 	}
 </script>
 
-{#if loading}
-	<div class="p-8">
-		<div class="animate-pulse">Loading Reddit data...</div>
-	</div>
-{:else if error}
-	<div class="p-8 text-red-600">
-		{error}
-	</div>
-{:else if redditData}
-	<div class="max-w-4xl mx-auto bg-white">
-		<!-- Post -->
-		{#if redditData.post}
-			<div class="border-b border-gray-200 p-6">
-				<div class="mb-4">
-					<span class="text-sm text-gray-500">r/{redditData.post.subreddit}</span>
-					<span class="text-sm text-gray-400 ml-2">• Posted by u/{redditData.post.author}</span>
+<div class="min-h-screen bg-gray-900 text-gray-100">
+	{#if loading}
+		<div class="p-8">
+			<div class="animate-pulse text-gray-300">Loading Reddit data...</div>
+		</div>
+	{:else if error}
+		<div class="p-8 text-red-400">
+			{error}
+		</div>
+	{:else if redditData}
+		<div class="max-w-4xl mx-auto bg-gray-800">
+			<!-- Post -->
+			{#if redditData.post}
+				<div class="border-b border-gray-700 p-6">
+					<div class="mb-4">
+						<span class="text-sm text-orange-400">r/{redditData.post.subreddit}</span>
+						<span class="text-sm text-gray-400 ml-2">• Posted by u/{redditData.post.author}</span>
+					</div>
+					<h1 class="text-2xl font-bold mb-4 text-white">{redditData.post.title}</h1>
+					{#if redditData.post.content}
+						<div class="text-gray-200 mb-4 whitespace-pre-wrap">{redditData.post.content}</div>
+					{/if}
+					<div class="text-sm text-gray-400">
+						{redditData.post.score} points • {redditData.post.comment_count} comments
+					</div>
 				</div>
-				<h1 class="text-2xl font-bold mb-4">{redditData.post.title}</h1>
-				{#if redditData.post.content}
-					<div class="text-gray-800 mb-4 whitespace-pre-wrap">{redditData.post.content}</div>
-				{/if}
-				<div class="text-sm text-gray-500">
-					{redditData.post.score} points • {redditData.post.comment_count} comments
-				</div>
-			</div>
-		{/if}
+			{/if}
 
-		<!-- Comments -->
-		{#if redditData.comments && redditData.comments.length > 0}
-			<div class="p-6">
-				<h2 class="text-lg font-semibold mb-4">Comments</h2>
-				{#each redditData.comments as comment}
-					{@const allComments = getAllComments(comment)}
-					{#each allComments as flatComment}
-						<div class="comment mb-4" style="margin-left: {flatComment.depth * 20}px">
-							<div class="border-l-2 border-gray-200 pl-4">
-								<div class="text-sm text-gray-600 mb-2">
-									<span class="font-medium">u/{flatComment.author}</span>
-									<span class="ml-2">{flatComment.score} points</span>
-									{#if flatComment.is_ai}
-										<span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">AI</span>
+			<!-- Comments -->
+			{#if redditData.comments && redditData.comments.length > 0}
+				<div class="p-6">
+					<h2 class="text-lg font-semibold mb-4 text-white">Comments</h2>
+					{#each redditData.comments as comment}
+						{@const allComments = getAllComments(comment)}
+						{#each allComments as flatComment}
+							<div class="comment mb-4" style="margin-left: {flatComment.depth * 20}px">
+								<div class="border-l-2 border-gray-600 pl-4">
+									<div class="text-sm text-gray-400 mb-2">
+										<span class="font-medium text-blue-400">u/{flatComment.author}</span>
+										<span class="ml-2">{flatComment.score} points</span>
+										{#if flatComment.is_ai}
+											<span class="ml-2 text-xs bg-purple-600 text-purple-100 px-2 py-1 rounded">AI</span>
+										{/if}
+									</div>
+									{#if flatComment.content_html}
+										<div class="text-gray-200 mb-3 prose prose-invert prose-sm max-w-none">{@html flatComment.content_html}</div>
+									{:else}
+										<div class="text-gray-200 mb-3 whitespace-pre-wrap">{flatComment.content}</div>
 									{/if}
 								</div>
-								{#if flatComment.content_html}
-									<div class="text-gray-800 mb-3">{@html flatComment.content_html}</div>
-								{:else}
-									<div class="text-gray-800 mb-3 whitespace-pre-wrap">{flatComment.content}</div>
-								{/if}
 							</div>
-						</div>
+						{/each}
 					{/each}
-				{/each}
-			</div>
-		{/if}
-	</div>
-{/if}
+				</div>
+			{/if}
+		</div>
+	{/if}
+</div>
