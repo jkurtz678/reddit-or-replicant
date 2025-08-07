@@ -388,7 +388,7 @@ def main():
     
     # Load original Reddit data
     try:
-        with open('test-reddit.json', 'r') as f:
+        with open('test-posts/test-reddit.json', 'r') as f:
             raw_data = json.load(f)
         print("Loaded original Reddit data")
     except FileNotFoundError:
@@ -447,7 +447,7 @@ def main():
     ai_reply_targets = []
     
     for i in range(target_ai_count):
-        if random.random() < 0.5:  # 50% chance of top-level vs reply
+        if random.random() < 0.5 and ai_top_level_count < 15:  # 50% chance of top-level vs reply, but max 15 top-level
             ai_top_level_count += 1
         else:
             # Choose random comment to reply to

@@ -93,12 +93,12 @@
 			{#if redditData.post}
 				<div class="border-b border-gray-700 p-6">
 					<div class="mb-4">
-						<span class="text-sm" style="color: #e4a853;">r/{redditData.post.subreddit}</span>
+						<span class="text-sm" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);">r/{redditData.post.subreddit}</span>
 						<span class="text-sm text-gray-400 ml-2">• Posted by u/{redditData.post.author}</span>
 					</div>
-					<h1 class="text-2xl font-bold mb-4" style="color: #f3f4f6; text-shadow: 0 0 10px rgba(243, 244, 246, 0.1);">{redditData.post.title}</h1>
+					<h1 class="text-2xl font-bold mb-4" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">{redditData.post.title}</h1>
 					{#if redditData.post.content}
-						<div class="text-gray-200 mb-4 whitespace-pre-wrap">{redditData.post.content}</div>
+						<div class="text-gray-200 mb-4 whitespace-pre-wrap content-text">{redditData.post.content}</div>
 					{/if}
 					<div class="text-sm text-gray-400">
 						{redditData.post.score} points • {redditData.post.comment_count} comments
@@ -121,16 +121,16 @@
 								 style="margin-left: {flatComment.depth * 20}px">
 								<div class="border-l-2 pl-3" style="border-color: rgba(75, 85, 99, 0.4);">
 									<div class="text-sm text-gray-400 mb-2">
-										<span class="font-medium" style="color: #93c5fd; text-shadow: 0 0 8px rgba(147, 197, 253, 0.1);">u/{flatComment.author}</span>
+										<span class="font-medium" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.2);">u/{flatComment.author}</span>
 										<span class="ml-2">{flatComment.score} points</span>
 									</div>
 									
 									{#if flatComment.content_html}
-										<div class="mb-3 prose prose-invert prose-sm max-w-none text-gray-200">
+										<div class="mb-3 prose prose-invert prose-sm max-w-none text-gray-200 content-text">
 											{@html flatComment.content_html}
 										</div>
 									{:else}
-										<div class="mb-3 whitespace-pre-wrap text-gray-200">
+										<div class="mb-3 whitespace-pre-wrap text-gray-200 content-text">
 											{flatComment.content}
 										</div>
 									{/if}
@@ -141,13 +141,19 @@
 											<div class="flex gap-3 items-center">
 												<span class="text-xs text-gray-400">Origin:</span>
 												<button 
-													class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs transition-colors"
+													class="px-2 py-1 text-white rounded text-xs transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer"
+													style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: 1px solid rgba(0, 212, 255, 0.3);"
+													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(0, 212, 255, 0.4)'}
+													on:mouseleave={(e) => e.target.style.boxShadow = ''}
 													on:click={() => makeGuess(flatComment.id, 'reddit', flatComment.is_ai)}
 												>
 													Reddit
 												</button>
 												<button 
-													class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs transition-colors"
+													class="px-2 py-1 text-white rounded text-xs transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer"
+													style="background: linear-gradient(135deg, #7f1d1d, #dc2626); border: 1px solid rgba(255, 69, 0, 0.3);"
+													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 69, 0, 0.4)'}
+													on:mouseleave={(e) => e.target.style.boxShadow = ''}
 													on:click={() => makeGuess(flatComment.id, 'replicant', flatComment.is_ai)}
 												>
 													Replicant
