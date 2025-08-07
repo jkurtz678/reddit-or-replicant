@@ -78,7 +78,7 @@
 	}
 </script>
 
-<div class="min-h-screen bg-gray-900 text-gray-100">
+<div class="min-h-screen text-gray-100" style="background: linear-gradient(180deg, #0a0a0b 0%, #111013 100%)">
 	{#if loading}
 		<div class="p-8">
 			<div class="animate-pulse text-gray-300">Loading Reddit data...</div>
@@ -88,15 +88,15 @@
 			{error}
 		</div>
 	{:else if redditData}
-		<div class="max-w-4xl mx-auto bg-gray-800">
+		<div class="max-w-4xl mx-auto" style="background: rgba(17, 17, 20, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(55, 65, 81, 0.3); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);">
 			<!-- Post -->
 			{#if redditData.post}
 				<div class="border-b border-gray-700 p-6">
 					<div class="mb-4">
-						<span class="text-sm text-orange-400">r/{redditData.post.subreddit}</span>
+						<span class="text-sm" style="color: #e4a853;">r/{redditData.post.subreddit}</span>
 						<span class="text-sm text-gray-400 ml-2">• Posted by u/{redditData.post.author}</span>
 					</div>
-					<h1 class="text-2xl font-bold mb-4 text-white">{redditData.post.title}</h1>
+					<h1 class="text-2xl font-bold mb-4" style="color: #f3f4f6; text-shadow: 0 0 10px rgba(243, 244, 246, 0.1);">{redditData.post.title}</h1>
 					{#if redditData.post.content}
 						<div class="text-gray-200 mb-4 whitespace-pre-wrap">{redditData.post.content}</div>
 					{/if}
@@ -119,9 +119,9 @@
 								 class:bg-green-900={guessState?.guessed && guessState?.correct}
 								 class:bg-red-900={guessState?.guessed && !guessState?.correct}
 								 style="margin-left: {flatComment.depth * 20}px">
-								<div class="border-l-2 border-gray-600 pl-4">
+								<div class="border-l-2 pl-4" style="border-color: rgba(75, 85, 99, 0.4);">
 									<div class="text-sm text-gray-400 mb-2">
-										<span class="font-medium text-blue-400">u/{flatComment.author}</span>
+										<span class="font-medium" style="color: #93c5fd; text-shadow: 0 0 8px rgba(147, 197, 253, 0.1);">u/{flatComment.author}</span>
 										<span class="ml-2">{flatComment.score} points</span>
 									</div>
 									
@@ -136,7 +136,7 @@
 									{/if}
 
 									<!-- Guessing Interface -->
-									<div class="border-t border-gray-600 pt-3">
+									<div class="pt-3" style="border-top: 1px solid rgba(75, 85, 99, 0.3);">
 										{#if !guessState?.guessed}
 											<div class="flex gap-3 items-center">
 												<span class="text-sm text-gray-400">Is this comment:</span>

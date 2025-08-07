@@ -158,22 +158,153 @@ def generate_ai_comments(post_title: str, post_content: str, subreddit: str,
         return []
 
 
-def mix_comments(real_comments: List[Comment], ai_comments: List[Comment], 
-                ai_percentage: float = 0.2) -> List[Comment]:
-    """Mix AI comments with real comments randomly"""
+def count_all_comments(comments: List[Comment]) -> int:
+    """Count all comments including nested replies"""
+    total = 0
+    for comment in comments:
+        total += 1  # Count this comment
+        total += count_all_comments(comment.replies)  # Count all replies recursively
+    return total
+
+
+def flatten_all_comments(comments: List[Comment]) -> List[Comment]:
+    """Flatten all comments into a single list"""
+    flattened = []
+    for comment in comments:
+        flattened.append(comment)
+        flattened.extend(flatten_all_comments(comment.replies))
+    return flattened
+
+
+def get_thread_context(comment: Comment, all_comments_flat: List[Comment]) -> List[Comment]:
+    """Get the full thread chain leading to a comment"""
+    thread = []
+    current = comment
     
-    total_real = len(real_comments)
-    target_ai_count = int(total_real * ai_percentage)
+    # Walk up the parent chain
+    while current.parent_id:
+        parent = next((c for c in all_comments_flat if c.id == current.parent_id), None)
+        if parent:
+            thread.insert(0, parent)  # Insert at beginning to maintain order
+            current = parent
+        else:
+            break
     
-    # Use only the number of AI comments we need
-    ai_to_use = ai_comments[:target_ai_count]
+    return thread
+
+
+def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
+                         thread_context: List[Comment], parent_comment: Comment,
+                         anthropic_client: anthropic.Anthropic) -> Comment:
+    """Generate a single AI reply to a specific comment with full thread context"""
     
-    # Combine and shuffle
-    mixed = real_comments + ai_to_use
-    random.shuffle(mixed)
+    # Build thread context string
+    context_str = ""
+    if thread_context:
+        context_str = "THREAD CONTEXT (conversation so far):\n"
+        for i, ctx_comment in enumerate(thread_context):
+            context_str += f"{i+1}. u/{ctx_comment.author}: {ctx_comment.content[:200]}{'...' if len(ctx_comment.content) > 200 else ''}\n"
+        context_str += "\n"
     
-    print(f"Mixed {len(real_comments)} real + {len(ai_to_use)} AI = {len(mixed)} total comments")
-    return mixed
+    prompt = f"""You are generating a realistic Reddit reply for r/{subreddit}.
+
+POST TITLE: {post_title}
+
+POST CONTENT: {post_content}
+
+{context_str}COMMENT YOU'RE REPLYING TO:
+u/{parent_comment.author}: {parent_comment.content}
+
+Generate 1 realistic Reddit reply to this comment. The reply should:
+
+1. Be contextually relevant to the immediate parent comment
+2. Consider the broader thread context if provided
+3. Sound natural and human-written
+4. Use a generic, unrelated username (NOT topic-related)
+5. Vary in style (could be short reaction, longer response, question, anecdote, etc.)
+
+CRITICAL: Make this indistinguishable from a real human reply. Don't try too hard to sound "Reddit-y".
+
+Format as JSON:
+{{"username": "generic_reddit_username", "content": "reply text"}}
+"""
+    
+    try:
+        response = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=800,
+            temperature=0.8,
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }]
+        )
+        
+        response_text = response.content[0].text
+        print(f"Generated thread reply: {response_text[:200]}...")
+        
+        # Parse JSON
+        start_idx = response_text.find('{')
+        end_idx = response_text.rfind('}') + 1
+        
+        if start_idx == -1 or end_idx == 0:
+            raise ValueError("No JSON found in response")
+            
+        json_str = response_text[start_idx:end_idx]
+        reply_data = json.loads(json_str)
+        
+        if 'username' not in reply_data or 'content' not in reply_data:
+            raise ValueError("Missing required fields in response")
+        
+        # Create reply with appropriate depth
+        reply = Comment(
+            id=str(uuid.uuid4()),
+            author=reply_data['username'],
+            content=reply_data['content'],
+            content_html=None,
+            score=random.randint(1, max(50, parent_comment.score)),
+            depth=parent_comment.depth + 1,
+            parent_id=parent_comment.id,
+            replies=[],
+            is_ai=True
+        )
+        
+        return reply
+        
+    except Exception as e:
+        print(f"Error generating thread reply: {e}")
+        return None
+
+
+def insert_ai_comments(real_comments: List[Comment], ai_top_level: List[Comment], 
+                      ai_replies: List[tuple[Comment, str]], ai_percentage: float) -> List[Comment]:
+    """Insert AI comments into the real comment structure"""
+    
+    # Start with real comments
+    mixed_comments = real_comments.copy()
+    
+    # Add top-level AI comments randomly
+    for ai_comment in ai_top_level:
+        insert_pos = random.randint(0, len(mixed_comments))
+        mixed_comments.insert(insert_pos, ai_comment)
+    
+    # Insert AI replies into threads
+    for ai_reply, parent_id in ai_replies:
+        # Find the parent comment in the mixed structure
+        def find_and_insert(comments):
+            for comment in comments:
+                if comment.id == parent_id:
+                    # Insert randomly among existing replies
+                    insert_pos = random.randint(0, len(comment.replies))
+                    comment.replies.insert(insert_pos, ai_reply)
+                    return True
+                elif find_and_insert(comment.replies):
+                    return True
+            return False
+        
+        find_and_insert(mixed_comments)
+    
+    return mixed_comments
 
 
 def main():
@@ -217,32 +348,77 @@ def main():
         print(f"Error parsing Reddit data: {e}")
         return
     
-    # Calculate how many AI comments to generate
+    # Count ALL comments (including nested) for true percentage calculation
+    total_real_comments = count_all_comments(real_comments)
     ai_percentage = 0.5  # 50%
-    num_ai_comments = int(len(real_comments) * ai_percentage)
+    target_ai_count = int(total_real_comments * ai_percentage)
     
-    if num_ai_comments == 0:
+    if target_ai_count == 0:
         print("Not enough real comments to generate AI comments")
         return
         
-    print(f"Generating {num_ai_comments} AI comments ({ai_percentage*100}% of {len(real_comments)} real comments)")
+    print(f"Total real comments (including nested): {total_real_comments}")
+    print(f"Target AI comments ({ai_percentage*100}%): {target_ai_count}")
     
-    # Generate AI comments
-    ai_comments = generate_ai_comments(
-        post.title,
-        post.content,
-        post.subreddit,
-        real_comments,
-        num_ai_comments,
-        client
-    )
+    # Randomly decide placement for each AI comment
+    # Get all possible parent locations (for thread replies)
+    all_real_flat = flatten_all_comments(real_comments)
     
-    if not ai_comments:
-        print("Failed to generate AI comments")
-        return
+    ai_top_level_count = 0
+    ai_reply_targets = []
     
-    # Mix comments
-    mixed_comments = mix_comments(real_comments, ai_comments, ai_percentage)
+    for i in range(target_ai_count):
+        if random.random() < 0.5:  # 50% chance of top-level vs reply
+            ai_top_level_count += 1
+        else:
+            # Choose random comment to reply to
+            parent = random.choice(all_real_flat)
+            ai_reply_targets.append(parent)
+    
+    print(f"Will generate: {ai_top_level_count} top-level AI comments, {len(ai_reply_targets)} thread replies")
+    
+    # Generate top-level AI comments
+    ai_top_level = []
+    if ai_top_level_count > 0:
+        ai_top_level = generate_ai_comments(
+            post.title,
+            post.content,
+            post.subreddit,
+            real_comments,
+            ai_top_level_count,
+            client
+        )
+        
+        if not ai_top_level:
+            print("Failed to generate top-level AI comments")
+            return
+    
+    # Generate thread replies
+    ai_replies = []
+    for parent_comment in ai_reply_targets:
+        print(f"Generating reply to u/{parent_comment.author}...")
+        
+        # Get full thread context
+        thread_context = get_thread_context(parent_comment, all_real_flat)
+        
+        ai_reply = generate_thread_reply(
+            post.title,
+            post.content,
+            post.subreddit,
+            thread_context,
+            parent_comment,
+            client
+        )
+        
+        if ai_reply:
+            ai_replies.append((ai_reply, parent_comment.id))
+        else:
+            print(f"Failed to generate reply to {parent_comment.id}")
+    
+    print(f"Successfully generated {len(ai_top_level)} top-level + {len(ai_replies)} thread replies")
+    
+    # Insert AI comments into structure
+    mixed_comments = insert_ai_comments(real_comments, ai_top_level, ai_replies, ai_percentage)
     
     def comment_to_dict(comment: Comment) -> dict:
         """Convert Comment object to dictionary for JSON serialization"""
@@ -276,8 +452,16 @@ def main():
     try:
         with open('mixed-comments.json', 'w') as f:
             json.dump(final_data, f, indent=2)
+        
+        # Count final results
+        total_final_comments = count_all_comments(mixed_comments)
+        total_ai_final = sum(1 for c in flatten_all_comments(mixed_comments) if c.is_ai)
+        
         print(f"Saved mixed comments to mixed-comments.json")
-        print(f"Total: {len(mixed_comments)} comments ({sum(1 for c in mixed_comments if c.is_ai)} AI)")
+        print(f"Final stats:")
+        print(f"  Total comments (all levels): {total_final_comments}")
+        print(f"  AI comments: {total_ai_final}")
+        print(f"  Actual AI percentage: {total_ai_final/total_final_comments*100:.1f}%")
         
     except Exception as e:
         print(f"Error saving mixed comments: {e}")
