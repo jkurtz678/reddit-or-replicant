@@ -17,7 +17,79 @@ import random
 import uuid
 from typing import List, Dict, Any
 import anthropic
+from faker import Faker
 from reddit_parser import parse_reddit_json, Comment
+
+# Initialize Faker for username generation
+fake = Faker()
+
+
+def generate_reddit_username() -> str:
+    """Generate a realistic Reddit-style username using Faker"""
+    patterns = [
+        # Basic username patterns
+        lambda: fake.user_name(),
+        lambda: f"{fake.first_name().lower()}{random.randint(1, 999)}",
+        lambda: f"{fake.last_name().lower()}{random.randint(10, 99)}",
+        
+        # Compound patterns  
+        lambda: f"{fake.word()}_{fake.word()}",
+        lambda: f"{fake.word()}{random.randint(1, 999)}",
+        lambda: f"throwaway_{random.randint(1000, 9999)}",
+        
+        # Gaming/internet style
+        lambda: f"x{fake.word().capitalize()}x",
+        lambda: f"{fake.word()}_guy_{random.randint(1, 99)}",
+        lambda: f"random_{fake.word()}_{random.randint(1, 999)}",
+        
+        # Reddit-specific patterns
+        lambda: f"deleted_user_{random.randint(1000, 9999)}",
+        lambda: f"{fake.color_name().lower()}{fake.word().capitalize()}{random.randint(1, 99)}",
+        lambda: f"{fake.word()}lover{random.randint(1, 999)}",
+    ]
+    
+    # Choose random pattern and generate
+    pattern = random.choice(patterns)
+    username = pattern()
+    
+    # Clean up username (remove invalid characters, ensure reasonable length)
+    username = ''.join(c for c in username if c.isalnum() or c in '_-')
+    username = username[:20]  # Max Reddit username length
+    
+    return username
+
+
+def anonymize_usernames(comments: List[Comment]) -> Dict[str, str]:
+    """Create mapping of real usernames to anonymized ones"""
+    # Get all unique usernames from the comment tree
+    def collect_usernames(comments_list):
+        usernames = set()
+        for comment in comments_list:
+            usernames.add(comment.author)
+            usernames.update(collect_usernames(comment.replies))
+        return usernames
+    
+    all_usernames = collect_usernames(comments)
+    
+    # Generate anonymized mapping
+    username_mapping = {}
+    for original_username in all_usernames:
+        # Generate unique anonymized username
+        while True:
+            new_username = generate_reddit_username()
+            if new_username not in username_mapping.values():
+                username_mapping[original_username] = new_username
+                break
+    
+    return username_mapping
+
+
+def apply_username_anonymization(comments: List[Comment], username_mapping: Dict[str, str]):
+    """Apply username anonymization to comment tree"""
+    for comment in comments:
+        if comment.author in username_mapping:
+            comment.author = username_mapping[comment.author]
+        apply_username_anonymization(comment.replies, username_mapping)
 
 
 def get_score_range(real_comments: List[Comment]) -> tuple[int, int]:
@@ -60,11 +132,6 @@ Generate {num_to_generate} realistic Reddit comments that would naturally appear
 
 CRITICAL REQUIREMENTS:
 
-USERNAMES: Create completely generic, unrelated usernames like the real ones above ({username_examples}). 
-- DO NOT make usernames relate to the post topic or content
-- Use random combinations like: numbers, random words, gaming terms, etc.
-- Examples of good generic usernames: mikejones234, xXgamerXx, throwaway_acc, techbro99
-
 COMMENT STYLE: Write like real humans, not like you're trying to sound like Reddit:
 - Don't force slang or try too hard to sound casual - be naturally conversational
 - Don't be overly helpful or informative - mix in casual reactions too
@@ -78,11 +145,10 @@ Vary between:
 - Casual sympathy/humor
 - Sometimes just acknowledgment
 
-Format as JSON array:
-- "username": generic Reddit username (NOT topic-related)
+Format as JSON array where each comment has:
 - "content": natural human comment
 
-Make these truly indistinguishable from real humans. Focus on sounding natural rather than "Reddit-y".
+DO NOT include usernames - just the comment content. Make these truly indistinguishable from real humans.
 """
     
     return prompt
@@ -133,13 +199,13 @@ def generate_ai_comments(post_title: str, post_content: str, subreddit: str,
         min_score, max_score = get_score_range(real_comments)
         
         for item in generated_data:
-            if not isinstance(item, dict) or 'username' not in item or 'content' not in item:
+            if not isinstance(item, dict) or 'content' not in item:
                 print(f"Skipping malformed comment: {item}")
                 continue
                 
             comment = Comment(
                 id=str(uuid.uuid4()),
-                author=item['username'],
+                author=generate_reddit_username(),  # Use Faker for username
                 content=item['content'],
                 content_html=None,  # No HTML for AI comments
                 score=random.randint(min_score, max_score),
@@ -226,7 +292,7 @@ Generate 1 realistic Reddit reply to this comment. The reply should:
 CRITICAL: Make this indistinguishable from a real human reply. Don't try too hard to sound "Reddit-y".
 
 Format as JSON:
-{{"username": "generic_reddit_username", "content": "reply text"}}
+{{"content": "reply text"}}
 """
     
     try:
@@ -253,13 +319,13 @@ Format as JSON:
         json_str = response_text[start_idx:end_idx]
         reply_data = json.loads(json_str)
         
-        if 'username' not in reply_data or 'content' not in reply_data:
+        if 'content' not in reply_data:
             raise ValueError("Missing required fields in response")
         
         # Create reply with appropriate depth
         reply = Comment(
             id=str(uuid.uuid4()),
-            author=reply_data['username'],
+            author=generate_reddit_username(),  # Use Faker for username
             content=reply_data['content'],
             content_html=None,
             score=random.randint(1, max(50, parent_comment.score)),
@@ -343,6 +409,19 @@ def main():
             return
             
         print(f"Parsed {len(real_comments)} real comments")
+        
+        # Anonymize real usernames
+        print("Anonymizing usernames...")
+        username_mapping = anonymize_usernames(real_comments)
+        apply_username_anonymization(real_comments, username_mapping)
+        
+        # Also anonymize post author
+        if post.author in username_mapping:
+            post.author = username_mapping[post.author]
+        else:
+            post.author = generate_reddit_username()
+            
+        print(f"Anonymized {len(username_mapping)} usernames")
         
     except Exception as e:
         print(f"Error parsing Reddit data: {e}")

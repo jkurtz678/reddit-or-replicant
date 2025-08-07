@@ -9,4 +9,5 @@ dependencies = [
     "uvicorn>=0.35.0",
     "httpx>=0.28.1",
     "anthropic>=0.40.0",
+    "faker>=30.8.2",
 ]
