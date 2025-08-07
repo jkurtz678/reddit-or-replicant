@@ -5,9 +5,12 @@ build/
 dist/
 wheels/
 *.egg-info
-mixed-comments.json
-test-posts/*
-test-reddit.json
+
 
 # Virtual environments
 .venv
+
+
+# json files
+mixed-comments.json
+test-posts/*
