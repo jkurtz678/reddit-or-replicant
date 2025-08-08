@@ -100,9 +100,22 @@
 
 <div class="min-h-screen text-gray-100" style="background: linear-gradient(180deg, #0a0a0b 0%, #111013 100%)">
 	<div class="container mx-auto p-8">
-		<h1 class="text-3xl font-bold mb-8 text-center" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">
-			Replicant - Reddit Posts
-		</h1>
+		<div class="text-center mb-12">
+			<h1 class="text-4xl font-bold mb-6" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">
+				Reddit or Replicant?
+			</h1>
+			<div class="max-w-3xl mx-auto space-y-3">
+				<p class="text-gray-300 text-lg leading-relaxed">
+					Millions of AI-generated posts flood social media daily, shaping public opinion without disclosure.
+				</p>
+				<p class="text-gray-300 text-lg leading-relaxed">
+					Platforms could implement transparency tools but prioritize engagement over truth.
+				</p>
+				<p class="text-gray-200 text-lg leading-relaxed font-medium">
+					How much of what you believe was planted by someone trying to manipulate you?
+				</p>
+			</div>
+		</div>
 
 		<!-- Posts List -->
 		{#if loading}
