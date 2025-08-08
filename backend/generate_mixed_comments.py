@@ -178,7 +178,7 @@ def generate_ai_comments(post_title: str, post_content: str, subreddit: str,
         
         # Parse the JSON response
         response_text = response.content[0].text
-        print(f"Claude response: {response_text[:500]}...")  # Debug output
+        #print(f"Claude response: {response_text[:500]}...")  # Debug output
         
         # Try to extract JSON from the response
         try:
@@ -310,7 +310,7 @@ Format as JSON:
         )
         
         response_text = response.content[0].text
-        print(f"Generated thread reply: {response_text[:200]}...")
+        # print(f"Generated thread reply: {response_text[:200]}...")
         
         # Parse JSON
         start_idx = response_text.find('{')
@@ -437,7 +437,7 @@ def main():
     
     # Count ALL comments (including nested) for true percentage calculation
     total_real_comments = count_all_comments(real_comments)
-    ai_percentage = 0.5  # 50%
+    ai_percentage = 0.7  # 70%
     target_ai_count = int(total_real_comments * ai_percentage)
     
     if target_ai_count == 0:
@@ -447,24 +447,19 @@ def main():
     print(f"Total real comments (including nested): {total_real_comments}")
     print(f"Target AI comments ({ai_percentage*100}%): {target_ai_count}")
     
-    # Randomly decide placement for each AI comment
-    # Get all possible parent locations (for thread replies)
-    all_real_flat = flatten_all_comments(real_comments)
-    
+    # Decide how many top-level vs reply AI comments
     ai_top_level_count = 0
-    ai_reply_targets = []
+    ai_reply_count = 0
     
     for i in range(target_ai_count):
         if random.random() < 0.5 and ai_top_level_count < 15:  # 50% chance of top-level vs reply, but max 15 top-level
             ai_top_level_count += 1
         else:
-            # Choose random comment to reply to
-            parent = random.choice(all_real_flat)
-            ai_reply_targets.append(parent)
+            ai_reply_count += 1
     
-    print(f"Will generate: {ai_top_level_count} top-level AI comments, {len(ai_reply_targets)} thread replies")
+    print(f"Will generate: {ai_top_level_count} top-level AI comments, {ai_reply_count} thread replies")
     
-    # Generate top-level AI comments
+    # Generate top-level AI comments first
     ai_top_level = []
     if ai_top_level_count > 0:
         ai_top_level = generate_ai_comments(
@@ -480,13 +475,22 @@ def main():
             print("Failed to generate top-level AI comments")
             return
     
-    # Generate thread replies
+    # Build pool of all comments (real + AI) for reply targets
+    all_comments_flat = flatten_all_comments(real_comments)  # Start with real comments
+    all_comments_flat.extend(ai_top_level)  # Add AI top-level comments
+    
+    # Generate thread replies - can target any comment (real or AI)
     ai_replies = []
-    for parent_comment in ai_reply_targets:
-        print(f"Generating reply to u/{parent_comment.author}...")
+    for i in range(ai_reply_count):
+        if not all_comments_flat:
+            break
+            
+        # Choose random comment to reply to (could be real or AI)
+        parent_comment = random.choice(all_comments_flat)
+        print(f"Generating reply to u/{parent_comment.author}{'[AI]' if parent_comment.is_ai else ''}...")
         
-        # Get full thread context
-        thread_context = get_thread_context(parent_comment, all_real_flat)
+        # Get full thread context (using all available comments)
+        thread_context = get_thread_context(parent_comment, all_comments_flat)
         
         ai_reply = generate_thread_reply(
             post.title,
