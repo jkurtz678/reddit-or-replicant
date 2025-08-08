@@ -18,7 +18,7 @@ import uuid
 from typing import List, Dict, Any
 import anthropic
 from faker import Faker
-from reddit_parser import parse_reddit_json, Comment, select_representative_comments
+from .reddit_parser import parse_reddit_json, Comment, select_representative_comments
 
 # Constants
 MAX_REDDIT_COMMENTS = 12
@@ -190,6 +190,11 @@ def generate_ai_comments(post_title: str, post_content: str, subreddit: str,
                 raise ValueError("No JSON array found in response")
                 
             json_str = response_text[start_idx:end_idx]
+            
+            # Clean control characters that can break JSON parsing
+            import re
+            json_str = re.sub(r'[\x00-\x1F\x7F]', '', json_str)
+            
             generated_data = json.loads(json_str)
             
         except (json.JSONDecodeError, ValueError) as e:
@@ -320,6 +325,11 @@ Format as JSON:
             raise ValueError("No JSON found in response")
             
         json_str = response_text[start_idx:end_idx]
+        
+        # Clean control characters that can break JSON parsing
+        import re
+        json_str = re.sub(r'[\x00-\x1F\x7F]', '', json_str)
+        
         reply_data = json.loads(json_str)
         
         if 'content' not in reply_data:
@@ -349,13 +359,9 @@ def insert_ai_comments(real_comments: List[Comment], ai_top_level: List[Comment]
                       ai_replies: List[tuple[Comment, str]], ai_percentage: float) -> List[Comment]:
     """Insert AI comments into the real comment structure"""
     
-    # Start with real comments
-    mixed_comments = real_comments.copy()
-    
-    # Add top-level AI comments randomly
-    for ai_comment in ai_top_level:
-        insert_pos = random.randint(0, len(mixed_comments))
-        mixed_comments.insert(insert_pos, ai_comment)
+    # Combine all top-level comments (real + AI) and shuffle them randomly
+    all_top_level = real_comments.copy() + ai_top_level
+    random.shuffle(all_top_level)
     
     # Insert AI replies into threads
     for ai_reply, parent_id in ai_replies:
@@ -371,9 +377,9 @@ def insert_ai_comments(real_comments: List[Comment], ai_top_level: List[Comment]
                     return True
             return False
         
-        find_and_insert(mixed_comments)
+        find_and_insert(all_top_level)
     
-    return mixed_comments
+    return all_top_level
 
 
 def main():
@@ -435,17 +441,16 @@ def main():
         print(f"Error parsing Reddit data: {e}")
         return
     
-    # Count ALL comments (including nested) for true percentage calculation
+    # Generate equal number of AI comments to match real comments (50/50 split)
     total_real_comments = count_all_comments(real_comments)
-    ai_percentage = 0.7  # 70%
-    target_ai_count = int(total_real_comments * ai_percentage)
+    target_ai_count = total_real_comments  # 1:1 ratio for balanced gameplay
     
     if target_ai_count == 0:
         print("Not enough real comments to generate AI comments")
         return
         
     print(f"Total real comments (including nested): {total_real_comments}")
-    print(f"Target AI comments ({ai_percentage*100}%): {target_ai_count}")
+    print(f"Target AI comments (50/50 split): {target_ai_count}")
     
     # Decide how many top-level vs reply AI comments
     ai_top_level_count = 0

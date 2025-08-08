@@ -9,11 +9,11 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
-from reddit_parser import parse_reddit_json, select_representative_comments
-from reddit_fetcher import fetch_reddit_post, extract_post_info, validate_reddit_url
-from database import save_post, get_post_by_id, get_all_posts, post_exists
+from src.reddit_parser import parse_reddit_json, select_representative_comments
+from src.reddit_fetcher import fetch_reddit_post, extract_post_info, validate_reddit_url
+from src.database import save_post, get_post_by_id, get_all_posts, post_exists
 import anthropic
-from generate_mixed_comments import (
+from src.generate_mixed_comments import (
     anonymize_usernames, apply_username_anonymization, count_all_comments,
     flatten_all_comments, generate_ai_comments, generate_thread_reply, 
     get_thread_context, insert_ai_comments, MAX_REDDIT_COMMENTS
@@ -51,14 +51,13 @@ def comment_to_dict(comment) -> dict:
 
 async def generate_mixed_comments_for_post(post, real_comments, client):
     """Generate mixed AI and real comments for a post"""
-    from generate_mixed_comments import generate_reddit_username
+    from src.generate_mixed_comments import generate_reddit_username
     import random
     import uuid
     
-    # Count ALL comments (including nested) for percentage calculation
+    # Generate equal number of AI comments to match real comments (50/50 split)
     total_real_comments = count_all_comments(real_comments)
-    ai_percentage = 0.7  # 70%
-    target_ai_count = int(total_real_comments * ai_percentage)
+    target_ai_count = total_real_comments  # 1:1 ratio for balanced gameplay
     
     if target_ai_count == 0:
         return real_comments
@@ -111,7 +110,7 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
             ai_replies.append((ai_reply, parent_comment.id))
     
     # Insert AI comments into structure
-    mixed_comments = insert_ai_comments(real_comments, ai_top_level, ai_replies, ai_percentage)
+    mixed_comments = insert_ai_comments(real_comments, ai_top_level, ai_replies, 0.5)  # 50/50 split
     return mixed_comments
 
 # API routes
@@ -168,7 +167,7 @@ async def submit_reddit_url(request: SubmitURLRequest):
         if post.author in username_mapping:
             post.author = username_mapping[post.author]
         else:
-            from generate_mixed_comments import generate_reddit_username
+            from src.generate_mixed_comments import generate_reddit_username
             post.author = generate_reddit_username()
         
         # Generate AI comments
