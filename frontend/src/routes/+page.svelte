@@ -75,6 +75,23 @@
 	// Track guessing state for each comment
 	let guessedComments = new Map<string, { guessed: boolean; correct: boolean; userGuess: 'reddit' | 'replicant' }>();
 
+	// Calculate stats for toolbar
+	$: totalComments = redditData ? getAllCommentsFlat(redditData.comments).length : 0;
+	$: guessedArray = Array.from(guessedComments.values());
+	$: correctGuesses = guessedArray.filter(g => g.correct).length;
+	$: incorrectGuesses = guessedArray.filter(g => !g.correct).length;
+	$: totalGuessed = guessedArray.length;
+	$: remainingGuesses = totalComments - totalGuessed;
+
+	function getAllCommentsFlat(comments: Comment[]): Comment[] {
+		const flat: Comment[] = [];
+		for (const comment of comments) {
+			flat.push(comment);
+			flat.push(...getAllCommentsFlat(comment.replies));
+		}
+		return flat;
+	}
+
 	function getAllComments(comment: Comment, allComments: Comment[] = []): Comment[] {
 		allComments.push(comment);
 		if (comment.replies && comment.replies.length > 0) {
@@ -119,16 +136,41 @@
 			</div>
 		</div>
 	{:else if redditData}
-		<div class="p-4">
-			<div class="max-w-4xl mx-auto mb-4 flex justify-between items-center">
-				<h1 class="text-2xl font-bold" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">
-					Replicant Game
-				</h1>
-				<a href="/submit" class="text-blue-400 hover:text-blue-300 transition-colors">
-					← Back to Submit Page
-				</a>
+		<!-- Fixed Toolbar -->
+		<div class="fixed top-0 left-0 right-0 z-50 border-b border-gray-700" style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);">
+			<div class="max-w-4xl mx-auto px-4 py-3">
+				<div class="flex items-center justify-between">
+					<!-- Back Button & Title -->
+					<div class="flex items-center gap-4">
+						<a href="/submit" class="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1">
+							← Back
+						</a>
+						<h1 class="text-lg font-bold" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
+							Reddit or Replicant?
+						</h1>
+					</div>
+					
+					<!-- Stats -->
+					<div class="flex items-center gap-6 text-sm">
+						<div class="flex items-center gap-2">
+							<span class="text-green-400">✓</span>
+							<span class="text-gray-300">{correctGuesses}</span>
+						</div>
+						<div class="flex items-center gap-2">
+							<span class="text-red-400">✗</span>
+							<span class="text-gray-300">{incorrectGuesses}</span>
+						</div>
+						<div class="flex items-center gap-2">
+							<span class="text-blue-400">Remaining:</span>
+							<span class="text-gray-200 font-medium">{remainingGuesses}</span>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
+
+		<!-- Content with top padding to account for fixed toolbar -->
+		<div class="pt-16">
 		<div class="max-w-4xl mx-auto" style="background: rgba(17, 17, 20, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(55, 65, 81, 0.3); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);">
 			<!-- Post -->
 			{#if redditData.post}
@@ -243,6 +285,7 @@
 					{/each}
 				</div>
 			{/if}
+		</div>
 		</div>
 	{/if}
 </div>
