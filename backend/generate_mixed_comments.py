@@ -18,7 +18,10 @@ import uuid
 from typing import List, Dict, Any
 import anthropic
 from faker import Faker
-from reddit_parser import parse_reddit_json, Comment
+from reddit_parser import parse_reddit_json, Comment, select_representative_comments
+
+# Constants
+MAX_REDDIT_COMMENTS = 12
 
 # Initialize Faker for username generation
 fake = Faker()
@@ -409,6 +412,11 @@ def main():
             return
             
         print(f"Parsed {len(real_comments)} real comments")
+        
+        # Select representative comments to limit size
+        print(f"Selecting representative comments (max {MAX_REDDIT_COMMENTS})...")
+        real_comments = select_representative_comments(real_comments, MAX_REDDIT_COMMENTS)
+        print(f"Selected {len(real_comments)} top-level comments with {count_all_comments(real_comments)} total comments")
         
         # Anonymize real usernames
         print("Anonymizing usernames...")

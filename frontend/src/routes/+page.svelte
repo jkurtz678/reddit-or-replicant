@@ -76,6 +76,11 @@
 		// Trigger reactivity
 		guessedComments = guessedComments;
 	}
+
+	// Calculate total comment count including nested replies
+	$: totalCommentCount = redditData ? redditData.comments.reduce((total, comment) => {
+		return total + getAllComments(comment).length;
+	}, 0) : 0;
 </script>
 
 <div class="min-h-screen text-gray-100" style="background: linear-gradient(180deg, #0a0a0b 0%, #111013 100%)">
@@ -101,7 +106,7 @@
 						<div class="text-gray-200 mb-4 whitespace-pre-wrap content-text">{redditData.post.content}</div>
 					{/if}
 					<div class="text-sm text-gray-400">
-						{redditData.post.score} points • {redditData.post.comment_count} comments
+						{redditData.post.score} points • {totalCommentCount} comments
 					</div>
 				</div>
 			{/if}

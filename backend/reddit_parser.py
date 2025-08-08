@@ -1,4 +1,5 @@
 import html
+import random
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
@@ -117,5 +118,131 @@ def parse_reddit_json(reddit_json: List[Dict[str, Any]]) -> Dict[str, Any]:
                 result['comments'].append(parse_comment(comment_item['data']))
     
     return result
+
+
+def select_representative_comments(comments: List[Comment], max_comments: int = 12) -> List[Comment]:
+    """
+    Select a representative subset of comments from a Reddit thread.
+    
+    Algorithm:
+    1. Sort top-level comments by score
+    2. Take up to max_comments/3 from the very top scorers
+    3. Fill remaining top-level slots randomly from the rest
+    4. For each selected top-level comment, consider adding highest-scoring replies
+    5. Stop when we hit max_comments total
+    
+    Args:
+        comments: List of top-level Comment objects (with nested replies)
+        max_comments: Maximum number of comments to select (default 12)
+    
+    Returns:
+        List of selected Comment objects with their reply structures intact
+    """
+    if len(comments) <= max_comments:
+        return comments.copy()
+    
+    # Separate top-level comments and sort by score
+    top_level_comments = [c for c in comments if c.depth == 0]
+    top_level_comments.sort(key=lambda x: x.score, reverse=True)
+    
+    selected_comments = []
+    total_count = 0
+    
+    # Step 1: Take up to max_comments/3 from very top scorers
+    max_from_top = max_comments // 3  # For 12 comments, this is 4
+    top_scorers = top_level_comments[:min(max_from_top, len(top_level_comments))]
+    
+    # Add top scorers with limited replies
+    for comment in top_scorers:
+        if total_count >= max_comments:
+            break
+            
+        # Create a copy of the comment
+        selected_comment = Comment(
+            id=comment.id,
+            author=comment.author,
+            content=comment.content,
+            content_html=comment.content_html,
+            score=comment.score,
+            depth=comment.depth,
+            parent_id=comment.parent_id,
+            replies=[],
+            is_ai=comment.is_ai
+        )
+        selected_comments.append(selected_comment)
+        total_count += 1
+        
+        # Add the best reply if we have space and this comment has replies
+        if comment.replies and total_count < max_comments:
+            best_reply = max(comment.replies, key=lambda x: x.score)
+            # Create a copy without sub-replies to keep it simple
+            reply_copy = Comment(
+                id=best_reply.id,
+                author=best_reply.author,
+                content=best_reply.content,
+                content_html=best_reply.content_html,
+                score=best_reply.score,
+                depth=best_reply.depth,
+                parent_id=best_reply.parent_id,
+                replies=[],  # No sub-replies for now
+                is_ai=best_reply.is_ai
+            )
+            selected_comment.replies.append(reply_copy)
+            total_count += 1
+    
+    # Step 2: Fill remaining slots with random top-level comments
+    remaining_slots = max_comments - total_count
+    remaining_top_level = top_level_comments[max_from_top:]
+    
+    if remaining_slots > 0 and remaining_top_level:
+        # Randomly select from the remaining comments
+        random.shuffle(remaining_top_level)
+        
+        for comment in remaining_top_level:
+            if total_count >= max_comments:
+                break
+                
+            # Add the top-level comment
+            selected_comment = Comment(
+                id=comment.id,
+                author=comment.author,
+                content=comment.content,
+                content_html=comment.content_html,
+                score=comment.score,
+                depth=comment.depth,
+                parent_id=comment.parent_id,
+                replies=[],
+                is_ai=comment.is_ai
+            )
+            selected_comments.append(selected_comment)
+            total_count += 1
+            
+            # Add one reply if we have space and this comment has replies
+            if comment.replies and total_count < max_comments:
+                best_reply = max(comment.replies, key=lambda x: x.score)
+                reply_copy = Comment(
+                    id=best_reply.id,
+                    author=best_reply.author,
+                    content=best_reply.content,
+                    content_html=best_reply.content_html,
+                    score=best_reply.score,
+                    depth=best_reply.depth,
+                    parent_id=best_reply.parent_id,
+                    replies=[],
+                    is_ai=best_reply.is_ai
+                )
+                selected_comment.replies.append(reply_copy)
+                total_count += 1
+    
+    return selected_comments
+
+
+def count_comments_recursive(comments: List[Comment]) -> int:
+    """Count total comments including nested replies"""
+    total = 0
+    for comment in comments:
+        total += 1
+        total += count_comments_recursive(comment.replies)
+    return total
 
 
