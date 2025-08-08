@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 
 	interface Post {
 		id: string;
@@ -32,24 +33,44 @@
 	let loading = true;
 	let error = '';
 
+	// Load post data only if post ID is provided in URL
 	onMount(async () => {
+		const postId = $page.url.searchParams.get('post');
+		
+		if (postId) {
+			await loadPost(parseInt(postId));
+		} else {
+			loading = false;
+			error = 'No post specified. Visit /submit to add Reddit posts.';
+		}
+	});
+
+	async function loadPost(postId: number) {
 		try {
-			const response = await fetch('/api/mixed-comments');
-			if (!response.ok) throw new Error('Failed to fetch');
+			loading = true;
+			error = '';
+			
+			const response = await fetch(`/api/mixed-comments/${postId}`);
+			if (!response.ok) {
+				if (response.status === 404) {
+					throw new Error('Post not found');
+				}
+				throw new Error('Failed to fetch post data');
+			}
 			const data = await response.json();
 			
-			if (data.error) {
-				error = data.error;
-			} else {
-				redditData = data;
-			}
-		} catch (err) {
-			error = 'Failed to load Reddit data';
+			redditData = data;
+			
+			// Reset guessing state
+			guessedComments = new Map();
+			
+		} catch (err: any) {
+			error = err.message;
 			console.error(err);
 		} finally {
 			loading = false;
 		}
-	});
+	}
 
 	// Track guessing state for each comment
 	let guessedComments = new Map<string, { guessed: boolean; correct: boolean; userGuess: 'reddit' | 'replicant' }>();
@@ -85,14 +106,29 @@
 
 <div class="min-h-screen text-gray-100" style="background: linear-gradient(180deg, #0a0a0b 0%, #111013 100%)">
 	{#if loading}
-		<div class="p-8">
-			<div class="animate-pulse text-gray-300">Loading Reddit data...</div>
+		<div class="flex items-center justify-center min-h-screen">
+			<div class="animate-pulse text-gray-300">Loading post...</div>
 		</div>
 	{:else if error}
-		<div class="p-8 text-red-400">
-			{error}
+		<div class="flex items-center justify-center min-h-screen">
+			<div class="text-center">
+				<div class="text-red-400 mb-4">{error}</div>
+				<a href="/submit" class="px-4 py-2 text-white rounded transition-all duration-200 hover:scale-105" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: 1px solid rgba(0, 212, 255, 0.3);">
+					Go to Submit Page
+				</a>
+			</div>
 		</div>
 	{:else if redditData}
+		<div class="p-4">
+			<div class="max-w-4xl mx-auto mb-4 flex justify-between items-center">
+				<h1 class="text-2xl font-bold" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">
+					Replicant Game
+				</h1>
+				<a href="/submit" class="text-blue-400 hover:text-blue-300 transition-colors">
+					← Back to Submit Page
+				</a>
+			</div>
+		</div>
 		<div class="max-w-4xl mx-auto" style="background: rgba(17, 17, 20, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(55, 65, 81, 0.3); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);">
 			<!-- Post -->
 			{#if redditData.post}

@@ -6,10 +6,16 @@ dist/
 wheels/
 *.egg-info
 
-
 # Virtual environments
 .venv
 
+# Environment files
+.env
+.env.local
+
+# Database files
+*.db
+*.sqlite
 
 # json files
 mixed-comments.json
