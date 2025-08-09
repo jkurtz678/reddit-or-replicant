@@ -202,7 +202,7 @@
 								 class:bg-gray-750={!guessState?.guessed}
 								 class:bg-green-900={guessState?.guessed && guessState?.correct}
 								 class:bg-red-900={guessState?.guessed && !guessState?.correct}
-								 style="margin-left: {flatComment.depth * 20}px">
+								 style="margin-left: {flatComment.depth * 32}px">
 								<div class="border-l-2 pl-3" style="border-color: rgba(75, 85, 99, 0.4);">
 									<div class="text-sm text-gray-400 mb-2">
 										<span class="font-medium" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.2);">u/{flatComment.author}</span>

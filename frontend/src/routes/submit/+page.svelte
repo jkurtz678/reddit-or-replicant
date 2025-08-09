@@ -104,15 +104,12 @@
 			<h1 class="text-4xl font-bold mb-6" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">
 				Reddit or Replicant?
 			</h1>
-			<div class="max-w-3xl mx-auto space-y-3">
-				<p class="text-gray-300 text-lg leading-relaxed">
-					Millions of AI-generated posts flood social media daily, shaping public opinion without disclosure.
+			<div class="max-w-2xl mx-auto space-y-2">
+				<p class="text-gray-200 text-xl leading-relaxed font-medium">
+					Your social media feed is flooded with AI content designed to manipulate you.
 				</p>
-				<p class="text-gray-300 text-lg leading-relaxed">
-					Platforms could implement transparency tools but prioritize engagement over truth.
-				</p>
-				<p class="text-gray-200 text-lg leading-relaxed font-medium">
-					How much of what you believe was planted by someone trying to manipulate you?
+				<p class="text-gray-200 text-xl leading-relaxed font-medium">
+					Can you tell what's real?
 				</p>
 			</div>
 		</div>
@@ -160,12 +157,12 @@
 								</div>
 								<div class="ml-4">
 									<button 
-										class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105"
+										class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
 										style="background: linear-gradient(135deg, #7f1d1d, #dc2626); border: 1px solid rgba(255, 69, 0, 0.3);"
 										on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 69, 0, 0.4)'}
 										on:mouseleave={(e) => e.target.style.boxShadow = ''}
 									>
-										Play Game
+										Begin Test
 									</button>
 								</div>
 							</div>
