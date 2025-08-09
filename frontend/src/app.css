@@ -15,3 +15,31 @@ body {
 	letter-spacing: 0.005em;
 	font-weight: 400;
 }
+
+/* Page transition animations */
+@media (prefers-reduced-motion: no-preference) {
+	/* View Transition API support for modern browsers */
+	::view-transition-old(root),
+	::view-transition-new(root) {
+		animation-duration: 300ms;
+		animation-timing-function: ease-in-out;
+	}
+
+	::view-transition-old(root) {
+		animation-name: fade-out;
+	}
+
+	::view-transition-new(root) {
+		animation-name: fade-in;
+	}
+
+	@keyframes fade-out {
+		from { opacity: 1; }
+		to { opacity: 0; }
+	}
+
+	@keyframes fade-in {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+}
