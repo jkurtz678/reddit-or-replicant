@@ -198,14 +198,15 @@
 						{@const allComments = getAllComments(comment)}
 						{#each allComments as flatComment}
 							{@const guessState = guessedComments.get(flatComment.id)}
-							<div class="comment mb-3 p-3 rounded-lg transition-colors" 
-								 class:bg-gray-750={!guessState?.guessed}
-								 class:bg-green-900={guessState?.guessed && guessState?.correct}
-								 class:bg-red-900={guessState?.guessed && !guessState?.correct}
+							<div class="comment mb-3 p-3 rounded-lg bg-gray-750" 
 								 style="margin-left: {flatComment.depth * 32}px">
 								<div class="border-l-2 pl-3" style="border-color: rgba(75, 85, 99, 0.4);">
 									<div class="text-sm text-gray-400 mb-2">
-										<span class="font-medium" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.2);">u/{flatComment.author}</span>
+										{#if guessState?.guessed && flatComment.is_ai}
+											<span class="font-medium text-red-400" in:fade={{ duration: 400 }}>Replicant</span>
+										{:else}
+											<span class="font-medium" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.2);">u/{flatComment.author}</span>
+										{/if}
 										<span class="ml-2">{flatComment.score} points</span>
 									</div>
 									
@@ -244,33 +245,31 @@
 												</button>
 											</div>
 										{:else}
-											<div class="space-y-1">
-												<div class="flex gap-3 items-center">
-													<span class="text-xs text-gray-400">Origin:</span>
-													<button 
-														class="px-2 py-1 rounded text-xs cursor-not-allowed"
-														class:bg-green-600={guessState.userGuess === 'reddit' && !flatComment.is_ai}
-														class:bg-red-600={guessState.userGuess === 'reddit' && flatComment.is_ai}
-														class:bg-gray-600={guessState.userGuess !== 'reddit'}
-														class:text-white={guessState.userGuess === 'reddit'}
-														class:text-gray-400={guessState.userGuess !== 'reddit'}
-														disabled
-													>
-														Reddit {guessState.userGuess === 'reddit' ? '✓' : ''}
-													</button>
-													<button 
-														class="px-2 py-1 rounded text-xs cursor-not-allowed"
-														class:bg-green-600={guessState.userGuess === 'replicant' && flatComment.is_ai}
-														class:bg-red-600={guessState.userGuess === 'replicant' && !flatComment.is_ai}
-														class:bg-gray-600={guessState.userGuess !== 'replicant'}
-														class:text-white={guessState.userGuess === 'replicant'}
-														class:text-gray-400={guessState.userGuess !== 'replicant'}
-														disabled
-													>
-														Replicant {guessState.userGuess === 'replicant' ? '✓' : ''}
-													</button>
-												</div>
-												<div class="text-xs">
+											<div class="flex gap-3 items-center">
+												<span class="text-xs text-gray-400">Origin:</span>
+												<button 
+													class="px-2 py-1 rounded text-xs cursor-not-allowed"
+													class:bg-green-600={guessState.userGuess === 'reddit' && !flatComment.is_ai}
+													class:bg-red-600={guessState.userGuess === 'reddit' && flatComment.is_ai}
+													class:bg-gray-600={guessState.userGuess !== 'reddit'}
+													class:text-white={guessState.userGuess === 'reddit'}
+													class:text-gray-400={guessState.userGuess !== 'reddit'}
+													disabled
+												>
+													Reddit {guessState.userGuess === 'reddit' ? '✓' : ''}
+												</button>
+												<button 
+													class="px-2 py-1 rounded text-xs cursor-not-allowed"
+													class:bg-green-600={guessState.userGuess === 'replicant' && flatComment.is_ai}
+													class:bg-red-600={guessState.userGuess === 'replicant' && !flatComment.is_ai}
+													class:bg-gray-600={guessState.userGuess !== 'replicant'}
+													class:text-white={guessState.userGuess === 'replicant'}
+													class:text-gray-400={guessState.userGuess !== 'replicant'}
+													disabled
+												>
+													Replicant {guessState.userGuess === 'replicant' ? '✓' : ''}
+												</button>
+												<div class="text-xs ml-2" in:fade={{ duration: 500, delay: 200 }}>
 													{#if guessState.correct}
 														<span class="text-green-400">✅ Correct! This was {flatComment.is_ai ? 'a replicant' : 'from Reddit'}.</span>
 													{:else}
