@@ -44,11 +44,18 @@ body {
 	}
 }
 
-/* Glitch effect for Replicant text */
-.glitch {
+/* Glitch effect for Replicant username only */
+.glitch:not(.content-text) {
 	position: relative;
 	color: #ff3333;
 	filter: drop-shadow(0 1px 3px);
+}
+
+/* Glitch effect for comment text - visual effects only, no color change */
+.content-text.glitch {
+	position: relative;
+	filter: drop-shadow(0 1px 3px);
+	/* Keep original color until glitching class is added */
 }
 
 
@@ -64,16 +71,16 @@ body {
 	top: 1px;
 	left: 2px;
 	color: #ff3333;
-	animation: glitch-paths 3s step-end infinite, glitch-opacity 3s step-end infinite,
-		glitch-font 4s step-end infinite, glitch-movement 5s step-end infinite;
+	animation: glitch-paths 4s step-end infinite, glitch-opacity 4s step-end infinite,
+		glitch-font 5s step-end infinite, glitch-movement 6s step-end infinite;
 }
 
 .glitch::after {
 	top: 1px;
 	left: -2px;
 	color: #1bc7fb;
-	animation: glitch-paths 3s step-end infinite, glitch-opacity 3s step-end infinite,
-		glitch-font 3.5s step-end infinite, glitch-movement 4s step-end infinite;
+	animation: glitch-paths 4s step-end infinite, glitch-opacity 4s step-end infinite,
+		glitch-font 4.5s step-end infinite, glitch-movement 5s step-end infinite;
 }
 
 @keyframes glitch-paths {
@@ -139,4 +146,23 @@ body {
 	50% { font-weight: 300; color: #1bc7fb; filter: blur(1px); }
 	60% { font-weight: 700; color: #ff3333; filter: blur(0); }
 	90% { font-weight: 500; color: #ff4444; filter: blur(2px); }
+}
+
+/* Smooth transition for font changes */
+.content-text {
+	transition: opacity 300ms ease-in-out;
+}
+
+/* Use monospace font and red color during glitching */
+.content-text.glitching {
+	font-family: 'JetBrains Mono', 'Courier New', monospace;
+	font-size: 0.9em;
+	letter-spacing: 0.02em;
+	color: #ff3333;
+	filter: drop-shadow(0 1px 3px);
+}
+
+/* Intermediate state during font transition */
+.content-text.transitioning {
+	opacity: 0;
 }

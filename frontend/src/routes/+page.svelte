@@ -1,7 +1,14 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import { fade } from 'svelte/transition';
+
+	// Glitch character pool - only ASCII characters that are truly monospace
+	const glitchChars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|\\;:,.<>?/~`';
+	
+	// Store original comment text and glitch intervals
+	let originalTexts = new Map();
+	let glitchIntervals = new Map();
 
 	interface Post {
 		id: string;
@@ -103,6 +110,85 @@
 		return allComments;
 	}
 
+	function startTextGlitch(commentId: string, originalText: string) {
+		// Store original text
+		originalTexts.set(commentId, originalText);
+		
+		const element = document.querySelector(`[data-comment-id="${commentId}"] .glitch-text`);
+		if (!element) return;
+		
+		// Step 1: Fade out with transitioning class
+		element.classList.add('transitioning');
+		
+		// Step 2: After fade out, switch to monospace and apply both glitch classes
+		setTimeout(() => {
+			element.classList.add('glitching');
+			element.classList.add('glitch');
+			element.classList.remove('transitioning');
+			
+			// Step 3: Start glitching after fade back in with random timing
+			setTimeout(() => {
+				function scheduleNextGlitch() {
+					const text = originalTexts.get(commentId) || originalText;
+					const textArray = text.split('');
+					
+					// Get indices of non-whitespace characters only
+					const nonWhitespaceIndices = [];
+					textArray.forEach((char, index) => {
+						if (char.trim() !== '') { // Skip spaces, tabs, newlines
+							nonWhitespaceIndices.push(index);
+						}
+					});
+					
+					// Randomize percentage between 1% and 4%
+					const randomPercentage = 0.01 + (Math.random() * 0.03);
+					const numToGlitch = Math.floor(nonWhitespaceIndices.length * randomPercentage);
+					const indicesToGlitch = new Set();
+					
+					// Pick random non-whitespace indices to glitch
+					while (indicesToGlitch.size < numToGlitch && nonWhitespaceIndices.length > 0) {
+						const randomIndex = nonWhitespaceIndices[Math.floor(Math.random() * nonWhitespaceIndices.length)];
+						indicesToGlitch.add(randomIndex);
+					}
+					
+					// Replace characters at those indices (preserving whitespace)
+					indicesToGlitch.forEach(index => {
+						textArray[index] = glitchChars[Math.floor(Math.random() * glitchChars.length)];
+					});
+					
+					element.textContent = textArray.join('');
+					
+					// Schedule next glitch with random timing (less frequent)
+					const nextDelay = 800 + Math.random() * 600; // Random between 800-1400ms
+					const timeout = setTimeout(scheduleNextGlitch, nextDelay);
+					glitchIntervals.set(commentId, timeout);
+				}
+				
+				scheduleNextGlitch();
+			}, 300); // Wait for fade back in
+		}, 300); // Wait for fade out (matches CSS transition)
+	}
+	
+	function stopTextGlitch(commentId: string) {
+		const timeout = glitchIntervals.get(commentId);
+		if (timeout) {
+			clearTimeout(timeout);
+			glitchIntervals.delete(commentId);
+		}
+		
+		// Restore original text and switch back to proportional font
+		const originalText = originalTexts.get(commentId);
+		if (originalText) {
+			const element = document.querySelector(`[data-comment-id="${commentId}"] .glitch-text`);
+			if (element) {
+				element.textContent = originalText;
+				element.classList.remove('glitching');
+				element.classList.remove('glitch');
+			}
+			originalTexts.delete(commentId);
+		}
+	}
+
 	function makeGuess(commentId: string, guess: 'reddit' | 'replicant', actualIsAi: boolean) {
 		const correct = (guess === 'replicant' && actualIsAi) || (guess === 'reddit' && !actualIsAi);
 		
@@ -114,12 +200,29 @@
 		
 		// Trigger reactivity
 		guessedComments = guessedComments;
+		
+		// Start text glitching for AI comments
+		if (actualIsAi) {
+			// Get the comment text
+			const comment = getAllCommentsFlat(redditData?.comments || []).find(c => c.id === commentId);
+			if (comment) {
+				// Start font transition immediately with the reveal
+				startTextGlitch(commentId, comment.content);
+			}
+		}
 	}
 
 	// Calculate total comment count including nested replies
 	$: totalCommentCount = redditData ? redditData.comments.reduce((total, comment) => {
 		return total + getAllComments(comment).length;
 	}, 0) : 0;
+	
+	// Cleanup timeouts on destroy
+	onDestroy(() => {
+		glitchIntervals.forEach(timeout => clearTimeout(timeout));
+		glitchIntervals.clear();
+		originalTexts.clear();
+	});
 </script>
 
 <div class="min-h-screen text-gray-100" style="background: linear-gradient(180deg, #0a0a0b 0%, #111013 100%)">
@@ -199,11 +302,12 @@
 						{#each allComments as flatComment}
 							{@const guessState = guessedComments.get(flatComment.id)}
 							<div class="comment mb-3 p-3 rounded-lg bg-gray-750" 
-								 style="margin-left: {flatComment.depth * 32}px">
+								 style="margin-left: {flatComment.depth * 32}px"
+								 data-comment-id={flatComment.id}>
 								<div class="border-l-2 pl-3" style="border-color: rgba(75, 85, 99, 0.4);">
 									<div class="text-sm text-gray-400 mb-2">
 										{#if guessState?.guessed && flatComment.is_ai}
-											<span class="font-medium glitch" data-text="Replicant" in:fade={{ duration: 400 }}>Replicant</span>
+											<span class="font-medium glitch" data-text="REPLICANT" in:fade={{ duration: 300 }}>REPLICANT</span>
 										{:else}
 											<span class="font-medium" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.2);">u/{flatComment.author}</span>
 										{/if}
@@ -211,14 +315,12 @@
 									</div>
 									
 									{#if flatComment.content_html}
-										<div class="mb-3 prose prose-invert prose-sm max-w-none text-gray-200 content-text" 
-											 class:glitch={guessState?.guessed && flatComment.is_ai} 
+										<div class="mb-3 prose prose-invert prose-sm max-w-none text-gray-200 content-text glitch-text" 
 											 data-text={flatComment.content}>
 											{@html flatComment.content_html}
 										</div>
 									{:else}
-										<div class="mb-3 whitespace-pre-wrap text-gray-200 content-text" 
-											 class:glitch={guessState?.guessed && flatComment.is_ai} 
+										<div class="mb-3 whitespace-pre-wrap text-gray-200 content-text glitch-text" 
 											 data-text={flatComment.content}>
 											{flatComment.content}
 										</div>
@@ -275,9 +377,9 @@
 												</button>
 												<div class="text-xs ml-2" in:fade={{ duration: 300, delay: 100 }}>
 													{#if guessState.correct}
-														<span class="text-green-400">✅ Correct! This was {flatComment.is_ai ? 'a replicant' : 'from Reddit'}.</span>
+														<span class="text-green-400">✅ {flatComment.is_ai ? 'Replicant identified' : 'Reddit origin confirmed'}.</span>
 													{:else}
-														<span class="text-red-400">❌ Wrong! This was actually {flatComment.is_ai ? 'a replicant' : 'from Reddit'}.</span>
+														<span class="text-red-400">❌ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
 													{/if}
 												</div>
 											</div>
