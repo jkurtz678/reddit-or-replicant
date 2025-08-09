@@ -203,7 +203,7 @@
 								<div class="border-l-2 pl-3" style="border-color: rgba(75, 85, 99, 0.4);">
 									<div class="text-sm text-gray-400 mb-2">
 										{#if guessState?.guessed && flatComment.is_ai}
-											<span class="font-medium text-red-400" in:fade={{ duration: 400 }}>Replicant</span>
+											<span class="font-medium glitch" data-text="Replicant" in:fade={{ duration: 400 }}>Replicant</span>
 										{:else}
 											<span class="font-medium" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.2);">u/{flatComment.author}</span>
 										{/if}
@@ -211,11 +211,15 @@
 									</div>
 									
 									{#if flatComment.content_html}
-										<div class="mb-3 prose prose-invert prose-sm max-w-none text-gray-200 content-text">
+										<div class="mb-3 prose prose-invert prose-sm max-w-none text-gray-200 content-text" 
+											 class:glitch={guessState?.guessed && flatComment.is_ai} 
+											 data-text={flatComment.content}>
 											{@html flatComment.content_html}
 										</div>
 									{:else}
-										<div class="mb-3 whitespace-pre-wrap text-gray-200 content-text">
+										<div class="mb-3 whitespace-pre-wrap text-gray-200 content-text" 
+											 class:glitch={guessState?.guessed && flatComment.is_ai} 
+											 data-text={flatComment.content}>
 											{flatComment.content}
 										</div>
 									{/if}
@@ -269,7 +273,7 @@
 												>
 													Replicant {guessState.userGuess === 'replicant' ? '✓' : ''}
 												</button>
-												<div class="text-xs ml-2" in:fade={{ duration: 500, delay: 200 }}>
+												<div class="text-xs ml-2" in:fade={{ duration: 300, delay: 100 }}>
 													{#if guessState.correct}
 														<span class="text-green-400">✅ Correct! This was {flatComment.is_ai ? 'a replicant' : 'from Reddit'}.</span>
 													{:else}
