@@ -102,7 +102,7 @@
 	<div class="container mx-auto p-8">
 		<div class="text-center mb-12">
 			<h1 class="text-4xl font-bold mb-6" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">
-				Reddit or Replicant?
+				Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
 			</h1>
 			<div class="max-w-2xl mx-auto space-y-2">
 				<p class="text-gray-200 text-xl leading-relaxed font-medium">
@@ -122,7 +122,7 @@
 		{:else if posts.length > 0}
 			<div class="max-w-4xl mx-auto">
 				<div class="flex justify-between items-center mb-6">
-					<h2 class="text-xl font-semibold text-white">Reddit Posts ({posts.length})</h2>
+					<h2 class="text-xl font-semibold text-white">Reddit Posts</h2>
 					<button 
 						on:click={openDialog}
 						class="px-4 py-2 text-white rounded transition-all duration-200 cursor-pointer hover:scale-105"

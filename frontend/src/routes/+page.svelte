@@ -250,7 +250,7 @@
 							← Back
 						</a>
 						<h1 class="text-lg font-bold" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
-							Reddit or Replicant?
+							Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
 						</h1>
 					</div>
 					
