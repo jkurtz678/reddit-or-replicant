@@ -80,9 +80,9 @@
 			closeDialog();
 			await loadPosts();
 			
-			// Navigate to the game page with the new post
+			// Navigate to the test page with the new post
 			if (result.id) {
-				goto(`/?post=${result.id}`);
+				goto(`/test?post=${result.id}`);
 			}
 			
 		} catch (err: any) {
@@ -94,25 +94,25 @@
 	}
 
 	function playGame(postId: number) {
-		goto(`/?post=${postId}`);
+		goto(`/test?post=${postId}`);
 	}
 </script>
 
 <div class="min-h-screen text-gray-100" style="background: linear-gradient(180deg, #0a0a0b 0%, #111013 100%)">
-	<div class="container mx-auto p-8">
-		<div class="text-center mb-12">
-			<h1 class="text-4xl font-bold mb-6" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">
-				Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
-			</h1>
-			<div class="max-w-2xl mx-auto space-y-2">
-				<p class="text-gray-200 text-xl leading-relaxed font-medium">
-					Your social media feed is flooded with AI content designed to manipulate you.
-				</p>
-				<p class="text-gray-200 text-xl leading-relaxed font-medium">
-					Can you tell what's real?
-				</p>
+	<!-- Fixed Toolbar -->
+	<div class="fixed top-0 left-0 right-0 z-50 border-b border-gray-700" style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);">
+		<div class="max-w-4xl mx-auto px-4 py-3">
+			<div class="flex items-center justify-center">
+				<a href="/" class="text-lg font-bold cursor-pointer hover:text-blue-300 transition-colors" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
+					Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
+				</a>
 			</div>
 		</div>
+	</div>
+
+	<!-- Content with top padding to account for fixed toolbar -->
+	<div class="pt-16">
+	<div class="container mx-auto p-8">
 
 		<!-- Posts List -->
 		{#if loading}
@@ -184,6 +184,7 @@
 				</button>
 			</div>
 		{/if}
+	</div>
 	</div>
 </div>
 
