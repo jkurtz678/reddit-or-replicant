@@ -18,11 +18,13 @@ import uuid
 from typing import List, Dict, Any
 import anthropic
 from faker import Faker
-from .reddit_parser import parse_reddit_json, Comment, select_representative_comments
+from ..reddit_parser import parse_reddit_json, Comment, select_representative_comments
 from .comment_archetypes import get_available_archetypes, build_full_prompt
+from .comment_legacy import generate_ai_comments_legacy
 
 # Constants
 MAX_REDDIT_COMMENTS = 12
+USE_ARCHETYPE_SYSTEM = False
 
 # Initialize Faker for username generation
 fake = Faker()
@@ -254,55 +256,6 @@ def generate_single_ai_comment(post_title: str, post_content: str, subreddit: st
         return None
 
 
-def create_generation_prompt(post_title: str, post_content: str, subreddit: str, 
-                           real_comments: List[Comment], num_to_generate: int) -> str:
-    """Create the prompt for Claude to generate realistic comments"""
-    
-    # Sample a few real comments for context
-    sample_comments = random.sample(real_comments, min(3, len(real_comments)))
-    
-    examples = "\n".join([
-        f"- u/{comment.author}: {comment.content[:150]}{'...' if len(comment.content) > 150 else ''}"
-        for comment in sample_comments
-    ])
-    
-    # Extract just the usernames for examples
-    real_usernames = [comment.author for comment in sample_comments]
-    username_examples = ", ".join(real_usernames)
-    
-    prompt = f"""You are generating realistic Reddit comments for r/{subreddit}. 
-
-POST TITLE: {post_title}
-
-POST CONTENT: {post_content}
-
-EXAMPLES OF REAL COMMENTS FROM THIS THREAD:
-{examples}
-
-Generate {num_to_generate} realistic Reddit comments that would naturally appear in this thread.
-
-CRITICAL REQUIREMENTS:
-
-COMMENT STYLE: Write like real humans, not like you're trying to sound like Reddit:
-- Don't force slang or try too hard to sound casual - be naturally conversational
-- Don't be overly helpful or informative - mix in casual reactions too
-- Some people just leave short reactions, others tell stories
-- Natural writing but don't overdo typos or internet speak
-- Avoid sounding like an expert giving advice unless it fits naturally
-
-Vary between:
-- Quick reactions ("oh no", "that sucks", "been there")  
-- Personal anecdotes (brief, natural)
-- Casual sympathy/humor
-- Sometimes just acknowledgment
-
-Format as JSON array where each comment has:
-- "content": natural human comment
-
-DO NOT include usernames - just the comment content. Make these truly indistinguishable from real humans.
-"""
-    
-    return prompt
 
 
 def generate_ai_comments_with_archetypes(post_title: str, post_content: str, subreddit: str,
@@ -344,13 +297,30 @@ def generate_ai_comments_with_archetypes(post_title: str, post_content: str, sub
     return ai_comments
 
 
+def generate_ai_comments_wrapper(post_title: str, post_content: str, subreddit: str,
+                               real_comments: List[Comment], num_to_generate: int,
+                               anthropic_client: anthropic.Anthropic) -> List[Comment]:
+    """Generate AI comments using either archetype or legacy system based on USE_ARCHETYPE_SYSTEM flag"""
+    
+    if USE_ARCHETYPE_SYSTEM:
+        print("Using archetype system for AI comment generation")
+        return generate_ai_comments_with_archetypes(
+            post_title, post_content, subreddit, real_comments, num_to_generate, anthropic_client
+        )
+    else:
+        print("Using legacy system for AI comment generation")
+        return generate_ai_comments_legacy(
+            post_title, post_content, subreddit, real_comments, num_to_generate, anthropic_client
+        )
+
+
 # Keep old function for backwards compatibility, but mark as deprecated
 def generate_ai_comments(post_title: str, post_content: str, subreddit: str,
                         real_comments: List[Comment], num_to_generate: int,
                         anthropic_client: anthropic.Anthropic) -> List[Comment]:
-    """Generate AI comments using Claude (DEPRECATED - use generate_ai_comments_with_archetypes)"""
+    """Generate AI comments using Claude (DEPRECATED - use generate_ai_comments_wrapper)"""
     print("Warning: Using deprecated generate_ai_comments function")
-    return generate_ai_comments_with_archetypes(
+    return generate_ai_comments_wrapper(
         post_title, post_content, subreddit, real_comments, num_to_generate, anthropic_client
     )
 
@@ -590,7 +560,7 @@ def main():
     # Generate top-level AI comments first
     ai_top_level = []
     if ai_top_level_count > 0:
-        ai_top_level = generate_ai_comments(
+        ai_top_level = generate_ai_comments_wrapper(
             post.title,
             post.content,
             post.subreddit,
@@ -637,7 +607,7 @@ def main():
     print(f"Successfully generated {len(ai_top_level)} top-level + {len(ai_replies)} thread replies")
     
     # Insert AI comments into structure
-    mixed_comments = insert_ai_comments(real_comments, ai_top_level, ai_replies, ai_percentage)
+    mixed_comments = insert_ai_comments(real_comments, ai_top_level, ai_replies, 0.5)  # 50/50 split
     
     def comment_to_dict(comment: Comment) -> dict:
         """Convert Comment object to dictionary for JSON serialization"""

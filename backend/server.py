@@ -13,9 +13,9 @@ from src.reddit_parser import parse_reddit_json, select_representative_comments
 from src.reddit_fetcher import fetch_reddit_post, extract_post_info, validate_reddit_url
 from src.database import save_post, get_post_by_id, get_all_posts, post_exists
 import anthropic
-from src.generate_mixed_comments import (
+from src.gen.generate_mixed_comments import (
     anonymize_usernames, apply_username_anonymization, count_all_comments,
-    flatten_all_comments, generate_ai_comments_with_archetypes, generate_thread_reply, 
+    flatten_all_comments, generate_ai_comments_wrapper, generate_thread_reply, 
     get_thread_context, insert_ai_comments, MAX_REDDIT_COMMENTS
 )
 from src.reddit_parser import Comment
@@ -52,7 +52,7 @@ def comment_to_dict(comment) -> dict:
 
 async def generate_mixed_comments_for_post(post, real_comments, client):
     """Generate mixed AI and real comments for a post"""
-    from src.generate_mixed_comments import generate_reddit_username
+    from src.gen.generate_mixed_comments import generate_reddit_username
     import random
     import uuid
     
@@ -78,7 +78,7 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
     # Generate top-level AI comments
     ai_top_level = []
     if ai_top_level_count > 0:
-        ai_top_level = generate_ai_comments_with_archetypes(
+        ai_top_level = generate_ai_comments_wrapper(
             post.title,
             post.content,
             post.subreddit,
@@ -123,7 +123,7 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
         additional_needed = target_ai_count - total_ai_generated
         print(f"Still need {additional_needed} more AI comments, generating additional top-level comments")
         
-        additional_ai = generate_ai_comments_with_archetypes(
+        additional_ai = generate_ai_comments_wrapper(
             post.title,
             post.content,
             post.subreddit,
@@ -218,7 +218,7 @@ async def submit_reddit_url(request: SubmitURLRequest):
         if post.author in username_mapping:
             post.author = username_mapping[post.author]
         else:
-            from src.generate_mixed_comments import generate_reddit_username
+            from src.gen.generate_mixed_comments import generate_reddit_username
             post.author = generate_reddit_username()
         
         # Generate AI comments
