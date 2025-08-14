@@ -19,6 +19,7 @@ from typing import List, Dict, Any
 import anthropic
 from faker import Faker
 from .reddit_parser import parse_reddit_json, Comment, select_representative_comments
+from .comment_archetypes import get_available_archetypes, build_full_prompt
 
 # Constants
 MAX_REDDIT_COMMENTS = 12
@@ -95,6 +96,69 @@ def apply_username_anonymization(comments: List[Comment], username_mapping: Dict
         apply_username_anonymization(comment.replies, username_mapping)
 
 
+def get_appropriate_archetypes(post_title: str, post_content: str, subreddit: str,
+                              anthropic_client: anthropic.Anthropic) -> List[str]:
+    """
+    Use AI to determine which archetypes are appropriate for this specific post
+    """
+    available_archetypes = get_available_archetypes(subreddit)
+    
+    # Create archetype descriptions for the AI to understand
+    archetype_descriptions = []
+    for archetype_key in available_archetypes:
+        from .comment_archetypes import get_archetype_prompt
+        archetype_data = get_archetype_prompt(archetype_key)
+        if archetype_data:
+            archetype_descriptions.append(f"- {archetype_key}: {archetype_data['description']}")
+    
+    prompt = f"""Given this Reddit post from r/{subreddit}, which comment archetypes would be most appropriate?
+
+POST TITLE: {post_title}
+POST CONTENT: {post_content}
+
+AVAILABLE ARCHETYPES:
+{chr(10).join(archetype_descriptions)}
+
+Consider:
+- The tone and seriousness of the post
+- What types of responses would naturally occur in r/{subreddit}
+- The emotional context and subject matter
+
+Select 4-6 archetypes that would be most appropriate for this post. List them exactly as shown above (e.g., "generic:supportive_friend").
+
+Respond with just the archetype keys, one per line."""
+
+    try:
+        response = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=300,
+            temperature=0.3,
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }]
+        )
+        
+        response_text = response.content[0].text.strip()
+        selected_archetypes = [line.strip() for line in response_text.split('\n') if line.strip()]
+        
+        # Validate that selected archetypes exist
+        valid_archetypes = [arch for arch in selected_archetypes if arch in available_archetypes]
+        
+        if not valid_archetypes:
+            print(f"No valid archetypes selected, using fallback")
+            # Fallback to generic archetypes
+            return [arch for arch in available_archetypes if arch.startswith('generic:')][:4]
+        
+        print(f"Selected archetypes for post: {valid_archetypes}")
+        return valid_archetypes
+        
+    except Exception as e:
+        print(f"Error selecting archetypes: {e}")
+        # Fallback to generic archetypes
+        return [arch for arch in available_archetypes if arch.startswith('generic:')][:4]
+
+
 def get_score_range(real_comments: List[Comment]) -> tuple[int, int]:
     """Get the score range from real comments to generate realistic AI scores"""
     scores = [comment.score for comment in real_comments if comment.score > 0]
@@ -104,6 +168,90 @@ def get_score_range(real_comments: List[Comment]) -> tuple[int, int]:
     min_score = max(1, min(scores))
     max_score = max(scores)
     return min_score, max_score
+
+
+def generate_single_ai_comment(post_title: str, post_content: str, subreddit: str,
+                              real_comments: List[Comment], archetype_key: str,
+                              anthropic_client: anthropic.Anthropic) -> Comment:
+    """Generate a single AI comment using a specific archetype"""
+    
+    # Sample a few real comments for context
+    sample_comments = random.sample(real_comments, min(3, len(real_comments)))
+    examples = "\n".join([
+        f"- u/{comment.author}: {comment.content[:150]}{'...' if len(comment.content) > 150 else ''}"
+        for comment in sample_comments
+    ])
+    
+    # Build the full prompt using the archetype system
+    prompt = build_full_prompt(
+        archetype_key=archetype_key,
+        subreddit=subreddit,
+        post_title=post_title,
+        post_content=post_content,
+        real_comment_examples=examples
+    )
+    
+    try:
+        response = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=800,  # Reduced since we're generating single comments
+            temperature=0.8,
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }]
+        )
+        
+        response_text = response.content[0].text.strip()
+        
+        # Try to extract JSON from the response
+        try:
+            # Look for JSON object in the response
+            start_idx = response_text.find('{')
+            end_idx = response_text.rfind('}') + 1
+            
+            if start_idx == -1 or end_idx == 0:
+                raise ValueError("No JSON object found in response")
+                
+            json_str = response_text[start_idx:end_idx]
+            
+            # Clean control characters that can break JSON parsing
+            import re
+            json_str = re.sub(r'[\x00-\x1F\x7F]', '', json_str)
+            
+            comment_data = json.loads(json_str)
+            
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"Failed to parse JSON from Claude response: {e}")
+            print(f"Raw response: {response_text}")
+            return None
+        
+        if not isinstance(comment_data, dict) or 'content' not in comment_data:
+            print(f"Malformed comment data: {comment_data}")
+            return None
+        
+        # Generate realistic score
+        min_score, max_score = get_score_range(real_comments)
+        
+        # Create Comment object
+        comment = Comment(
+            id=str(uuid.uuid4()),
+            author=generate_reddit_username(),
+            content=comment_data['content'],
+            content_html=None,  # No HTML for AI comments
+            score=random.randint(min_score, max_score),
+            depth=0,
+            parent_id=None,
+            replies=[],
+            is_ai=True
+        )
+        
+        print(f"Generated comment with archetype {archetype_key}: {comment.content[:50]}...")
+        return comment
+        
+    except Exception as e:
+        print(f"Error generating AI comment with archetype {archetype_key}: {e}")
+        return None
 
 
 def create_generation_prompt(post_title: str, post_content: str, subreddit: str, 
@@ -157,79 +305,54 @@ DO NOT include usernames - just the comment content. Make these truly indistingu
     return prompt
 
 
+def generate_ai_comments_with_archetypes(post_title: str, post_content: str, subreddit: str,
+                                        real_comments: List[Comment], num_to_generate: int,
+                                        anthropic_client: anthropic.Anthropic) -> List[Comment]:
+    """Generate AI comments using the archetype system"""
+    
+    # Step 1: Get appropriate archetypes for this post
+    appropriate_archetypes = get_appropriate_archetypes(
+        post_title, post_content, subreddit, anthropic_client
+    )
+    
+    if not appropriate_archetypes:
+        print("No appropriate archetypes found, cannot generate AI comments")
+        return []
+    
+    # Step 2: Generate individual comments using random archetypes
+    ai_comments = []
+    for i in range(num_to_generate):
+        # Randomly select an archetype from the appropriate ones
+        selected_archetype = random.choice(appropriate_archetypes)
+        
+        # Generate single comment with this archetype
+        comment = generate_single_ai_comment(
+            post_title=post_title,
+            post_content=post_content,
+            subreddit=subreddit,
+            real_comments=real_comments,
+            archetype_key=selected_archetype,
+            anthropic_client=anthropic_client
+        )
+        
+        if comment:
+            ai_comments.append(comment)
+        else:
+            print(f"Failed to generate comment {i+1}/{num_to_generate}")
+    
+    print(f"Successfully generated {len(ai_comments)}/{num_to_generate} AI comments using archetypes")
+    return ai_comments
+
+
+# Keep old function for backwards compatibility, but mark as deprecated
 def generate_ai_comments(post_title: str, post_content: str, subreddit: str,
                         real_comments: List[Comment], num_to_generate: int,
                         anthropic_client: anthropic.Anthropic) -> List[Comment]:
-    """Generate AI comments using Claude"""
-    
-    prompt = create_generation_prompt(post_title, post_content, subreddit, 
-                                    real_comments, num_to_generate)
-    
-    try:
-        response = anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=2000,
-            temperature=0.8,  # Higher temperature for more variety
-            messages=[{
-                "role": "user",
-                "content": prompt
-            }]
-        )
-        
-        # Parse the JSON response
-        response_text = response.content[0].text
-        #print(f"Claude response: {response_text[:500]}...")  # Debug output
-        
-        # Try to extract JSON from the response
-        try:
-            # Look for JSON array in the response
-            start_idx = response_text.find('[')
-            end_idx = response_text.rfind(']') + 1
-            
-            if start_idx == -1 or end_idx == 0:
-                raise ValueError("No JSON array found in response")
-                
-            json_str = response_text[start_idx:end_idx]
-            
-            # Clean control characters that can break JSON parsing
-            import re
-            json_str = re.sub(r'[\x00-\x1F\x7F]', '', json_str)
-            
-            generated_data = json.loads(json_str)
-            
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"Failed to parse JSON from Claude response: {e}")
-            print(f"Raw response: {response_text}")
-            return []
-        
-        # Convert to Comment objects
-        ai_comments = []
-        min_score, max_score = get_score_range(real_comments)
-        
-        for item in generated_data:
-            if not isinstance(item, dict) or 'content' not in item:
-                print(f"Skipping malformed comment: {item}")
-                continue
-                
-            comment = Comment(
-                id=str(uuid.uuid4()),
-                author=generate_reddit_username(),  # Use Faker for username
-                content=item['content'],
-                content_html=None,  # No HTML for AI comments
-                score=random.randint(min_score, max_score),
-                depth=0,
-                parent_id=None,
-                replies=[],
-                is_ai=True
-            )
-            ai_comments.append(comment)
-        
-        print(f"Generated {len(ai_comments)} AI comments")
-        return ai_comments
-        
-    except Exception as e:
-        print(f"Error generating AI comments: {e}")
-        return []
+    """Generate AI comments using Claude (DEPRECATED - use generate_ai_comments_with_archetypes)"""
+    print("Warning: Using deprecated generate_ai_comments function")
+    return generate_ai_comments_with_archetypes(
+        post_title, post_content, subreddit, real_comments, num_to_generate, anthropic_client
+    )
 
 
 def count_all_comments(comments: List[Comment]) -> int:

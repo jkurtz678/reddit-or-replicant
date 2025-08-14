@@ -15,9 +15,10 @@ from src.database import save_post, get_post_by_id, get_all_posts, post_exists
 import anthropic
 from src.generate_mixed_comments import (
     anonymize_usernames, apply_username_anonymization, count_all_comments,
-    flatten_all_comments, generate_ai_comments, generate_thread_reply, 
+    flatten_all_comments, generate_ai_comments_with_archetypes, generate_thread_reply, 
     get_thread_context, insert_ai_comments, MAX_REDDIT_COMMENTS
 )
+from src.reddit_parser import Comment
 
 app = FastAPI()
 
@@ -55,47 +56,54 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
     import random
     import uuid
     
-    # Generate equal number of AI comments to match real comments (50/50 split)
-    total_real_comments = count_all_comments(real_comments)
-    target_ai_count = total_real_comments  # 1:1 ratio for balanced gameplay
+    # Fixed counts: 8 human + 8 AI comments for balanced gameplay
+    target_human_count = 8
+    target_ai_count = 8
     
-    if target_ai_count == 0:
-        return real_comments
+    # Step 1: Limit real comments to exactly 8 total (including nested)
+    # We need to carefully trim the tree to keep exactly 8 comments while preserving structure
+    all_real_flat = flatten_all_comments(real_comments)
+    if len(all_real_flat) > target_human_count:
+        # Take first 8 comments and rebuild a tree structure
+        limited_real_flat = all_real_flat[:target_human_count]
+        # Convert back to tree structure by filtering original tree
+        limited_real_comments = filter_comments_to_subset(real_comments, limited_real_flat)
+    else:
+        limited_real_comments = real_comments
     
-    # Decide how many top-level vs reply AI comments
-    ai_top_level_count = 0
-    ai_reply_count = 0
+    # Step 2: Generate AI comments (mix of top-level and replies)
+    ai_top_level_count = min(4, target_ai_count)  # At most 4 top-level AI comments
+    ai_reply_count = target_ai_count - ai_top_level_count
     
-    for i in range(target_ai_count):
-        if random.random() < 0.5 and ai_top_level_count < 15:
-            ai_top_level_count += 1
-        else:
-            ai_reply_count += 1
-    
-    # Generate top-level AI comments first
+    # Generate top-level AI comments
     ai_top_level = []
     if ai_top_level_count > 0:
-        ai_top_level = generate_ai_comments(
+        ai_top_level = generate_ai_comments_with_archetypes(
             post.title,
             post.content,
             post.subreddit,
-            real_comments,
+            flatten_all_comments(limited_real_comments),
             ai_top_level_count,
             client
         )
     
-    # Build pool of all comments (real + AI) for reply targets
-    all_comments_flat = flatten_all_comments(real_comments)
-    all_comments_flat.extend(ai_top_level)
+    # If we didn't get enough top-level AI comments, adjust the reply count to compensate
+    actual_top_level_count = len(ai_top_level)
+    remaining_ai_needed = target_ai_count - actual_top_level_count
+    ai_reply_count = remaining_ai_needed
     
-    # Generate thread replies
+    print(f"Generated {actual_top_level_count} top-level AI comments, need {ai_reply_count} more as replies")
+    
+    # Generate AI replies
     ai_replies = []
+    all_comments_for_replies = flatten_all_comments(limited_real_comments) + ai_top_level
+    
     for i in range(ai_reply_count):
-        if not all_comments_flat:
+        if not all_comments_for_replies:
             break
         
-        parent_comment = random.choice(all_comments_flat)
-        thread_context = get_thread_context(parent_comment, all_comments_flat)
+        parent_comment = random.choice(all_comments_for_replies)
+        thread_context = get_thread_context(parent_comment, all_comments_for_replies)
         
         ai_reply = generate_thread_reply(
             post.title,
@@ -109,9 +117,52 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
         if ai_reply:
             ai_replies.append((ai_reply, parent_comment.id))
     
-    # Insert AI comments into structure
-    mixed_comments = insert_ai_comments(real_comments, ai_top_level, ai_replies, 0.5)  # 50/50 split
+    # Final check: if we still don't have enough AI comments, generate more top-level ones
+    total_ai_generated = len(ai_top_level) + len(ai_replies)
+    if total_ai_generated < target_ai_count:
+        additional_needed = target_ai_count - total_ai_generated
+        print(f"Still need {additional_needed} more AI comments, generating additional top-level comments")
+        
+        additional_ai = generate_ai_comments_with_archetypes(
+            post.title,
+            post.content,
+            post.subreddit,
+            flatten_all_comments(limited_real_comments),
+            additional_needed,
+            client
+        )
+        ai_top_level.extend(additional_ai)
+    
+    # Step 3: Insert AI comments into the tree structure (preserving hierarchy)
+    mixed_comments = insert_ai_comments(limited_real_comments, ai_top_level, ai_replies, 0.5)
+    
     return mixed_comments
+
+
+def filter_comments_to_subset(comment_tree, target_flat_list):
+    """Filter a comment tree to only include comments that are in the target flat list"""
+    target_ids = {comment.id for comment in target_flat_list}
+    
+    def filter_recursive(comments):
+        filtered = []
+        for comment in comments:
+            if comment.id in target_ids:
+                # Keep this comment and filter its replies
+                filtered_comment = Comment(
+                    id=comment.id,
+                    author=comment.author,
+                    content=comment.content,
+                    content_html=comment.content_html,
+                    score=comment.score,
+                    depth=comment.depth,
+                    parent_id=comment.parent_id,
+                    replies=filter_recursive(comment.replies),
+                    is_ai=comment.is_ai
+                )
+                filtered.append(filtered_comment)
+        return filtered
+    
+    return filter_recursive(comment_tree)
 
 # API routes
 @app.get("/api")
