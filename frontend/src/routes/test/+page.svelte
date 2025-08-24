@@ -242,11 +242,11 @@
 	{:else if redditData}
 		<!-- Fixed Toolbar -->
 		<div class="fixed top-0 left-0 right-0 z-50 border-b border-gray-700" style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);">
-			<div class="max-w-4xl mx-auto px-4 py-3">
+			<div class="max-w-4xl mx-auto px-4 md:px-0 py-3">
 				<div class="flex items-center justify-between">
 					<!-- Back Button & Title -->
 					<div class="flex items-center gap-4">
-						<a href="/selection" class="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1">
+						<a href="/selection" class="transition-colors flex items-center gap-1" style="color: #00d4ff;" on:mouseenter={(e) => e.target.style.color='#33e0ff'} on:mouseleave={(e) => e.target.style.color='#00d4ff'}>
 							← Back
 						</a>
 						<h1 class="text-lg font-bold" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
@@ -257,11 +257,11 @@
 					<!-- Stats -->
 					<div class="flex items-center gap-6 text-sm">
 						<div class="flex items-center gap-2">
-							<span class="text-green-400">✓</span>
+							<span style="color: #4ade80;">✓</span>
 							<span class="text-gray-300">{correctGuesses}</span>
 						</div>
 						<div class="flex items-center gap-2">
-							<span class="text-amber-400">✗</span>
+							<span style="color: #f87171;">✗</span>
 							<span class="text-gray-300">{incorrectGuesses}</span>
 						</div>
 						<div class="flex items-center gap-2">
@@ -333,7 +333,7 @@
 												<span class="text-xs text-gray-400">Origin:</span>
 												<button 
 													class="px-2 py-1 text-white rounded text-xs transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer"
-													style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: 1px solid rgba(0, 212, 255, 0.3);"
+													style="background: linear-gradient(135deg, #164e63, #0891b2); border: 1px solid rgba(0, 212, 255, 0.3);"
 													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(0, 212, 255, 0.4)'}
 													on:mouseleave={(e) => e.target.style.boxShadow = ''}
 													on:click={() => makeGuess(flatComment.id, 'reddit', flatComment.is_ai)}
@@ -355,8 +355,7 @@
 												<span class="text-xs text-gray-400">Origin:</span>
 												<button 
 													class="px-2 py-1 rounded text-xs cursor-not-allowed"
-													class:bg-green-600={guessState.userGuess === 'reddit' && !flatComment.is_ai}
-													class:bg-amber-600={guessState.userGuess === 'reddit' && flatComment.is_ai}
+													class:bg-cyan-700={guessState.userGuess === 'reddit'}
 													class:bg-gray-600={guessState.userGuess !== 'reddit'}
 													class:text-white={guessState.userGuess === 'reddit'}
 													class:text-gray-400={guessState.userGuess !== 'reddit'}
@@ -366,8 +365,7 @@
 												</button>
 												<button 
 													class="px-2 py-1 rounded text-xs cursor-not-allowed"
-													class:bg-green-600={guessState.userGuess === 'replicant' && flatComment.is_ai}
-													class:bg-amber-600={guessState.userGuess === 'replicant' && !flatComment.is_ai}
+													class:bg-amber-700={guessState.userGuess === 'replicant'}
 													class:bg-gray-600={guessState.userGuess !== 'replicant'}
 													class:text-white={guessState.userGuess === 'replicant'}
 													class:text-gray-400={guessState.userGuess !== 'replicant'}
@@ -377,9 +375,9 @@
 												</button>
 												<div class="text-xs ml-2" in:fade={{ duration: 300, delay: 100 }}>
 													{#if guessState.correct}
-														<span class="text-green-400">✅ {flatComment.is_ai ? 'Replicant identified' : 'Reddit origin confirmed'}.</span>
+														<span style="color: #4ade80;">✓ {flatComment.is_ai ? 'Replicant identified' : 'Reddit origin confirmed'}.</span>
 													{:else}
-														<span class="text-amber-400">❌ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
+														<span style="color: #f87171;">✗ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
 													{/if}
 												</div>
 											</div>

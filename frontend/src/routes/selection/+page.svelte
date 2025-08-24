@@ -105,7 +105,7 @@
 <div class="min-h-screen text-gray-100" style="background: linear-gradient(180deg, #0a0a0b 0%, #111013 100%)">
 	<!-- Fixed Toolbar -->
 	<div class="fixed top-0 left-0 right-0 z-50 border-b border-gray-700" style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);">
-		<div class="max-w-4xl mx-auto px-4 py-3">
+		<div class="max-w-4xl mx-auto px-4 md:px-0 py-3">
 			<div class="flex items-center justify-between">
 				<a href="/" class="text-lg font-bold cursor-pointer hover:text-blue-300 transition-colors" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
 					Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
@@ -124,7 +124,7 @@
 
 	<!-- Content with top padding to account for fixed toolbar -->
 	<div class="pt-16">
-	<div class="container mx-auto p-8">
+	<div class="container mx-auto p-8 md:px-0">
 
 		<!-- Posts List -->
 		{#if loading}
@@ -157,15 +157,12 @@
 							role="button"
 							tabindex="0"
 						>
-							<div class="flex justify-between items-start mb-3">
+							<div class="flex justify-between items-start">
 								<div class="flex-1">
 									<h3 class="font-medium text-white mb-2 text-lg">{post.title}</h3>
-									<div class="text-sm text-gray-400 mb-2">
+									<div class="text-sm text-gray-400">
 										<span style="color: #00d4ff;">r/{post.subreddit}</span>
 										• {post.total_count} comments
-									</div>
-									<div class="text-xs text-gray-500">
-										Added {new Date(post.created_at).toLocaleDateString()}
 									</div>
 								</div>
 								<div class="ml-4">
