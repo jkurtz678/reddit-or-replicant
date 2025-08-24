@@ -233,7 +233,7 @@
 	{:else if error}
 		<div class="flex items-center justify-center min-h-screen">
 			<div class="text-center">
-				<div class="text-red-400 mb-4">{error}</div>
+				<div class="text-amber-400 mb-4">{error}</div>
 				<a href="/selection" class="px-4 py-2 text-white rounded transition-all duration-200 hover:scale-105" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: 1px solid rgba(0, 212, 255, 0.3);">
 					Go to Selection Page
 				</a>
@@ -261,7 +261,7 @@
 							<span class="text-gray-300">{correctGuesses}</span>
 						</div>
 						<div class="flex items-center gap-2">
-							<span class="text-red-400">✗</span>
+							<span class="text-amber-400">✗</span>
 							<span class="text-gray-300">{incorrectGuesses}</span>
 						</div>
 						<div class="flex items-center gap-2">
@@ -342,8 +342,8 @@
 												</button>
 												<button 
 													class="px-2 py-1 text-white rounded text-xs transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer"
-													style="background: linear-gradient(135deg, #7f1d1d, #dc2626); border: 1px solid rgba(255, 69, 0, 0.3);"
-													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 69, 0, 0.4)'}
+													style="background: linear-gradient(135deg, #c2410c, #ff8c42); border: 1px solid rgba(255, 140, 66, 0.3);"
+													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 140, 66, 0.4)'}
 													on:mouseleave={(e) => e.target.style.boxShadow = ''}
 													on:click={() => makeGuess(flatComment.id, 'replicant', flatComment.is_ai)}
 												>
@@ -356,7 +356,7 @@
 												<button 
 													class="px-2 py-1 rounded text-xs cursor-not-allowed"
 													class:bg-green-600={guessState.userGuess === 'reddit' && !flatComment.is_ai}
-													class:bg-red-600={guessState.userGuess === 'reddit' && flatComment.is_ai}
+													class:bg-amber-600={guessState.userGuess === 'reddit' && flatComment.is_ai}
 													class:bg-gray-600={guessState.userGuess !== 'reddit'}
 													class:text-white={guessState.userGuess === 'reddit'}
 													class:text-gray-400={guessState.userGuess !== 'reddit'}
@@ -367,7 +367,7 @@
 												<button 
 													class="px-2 py-1 rounded text-xs cursor-not-allowed"
 													class:bg-green-600={guessState.userGuess === 'replicant' && flatComment.is_ai}
-													class:bg-red-600={guessState.userGuess === 'replicant' && !flatComment.is_ai}
+													class:bg-amber-600={guessState.userGuess === 'replicant' && !flatComment.is_ai}
 													class:bg-gray-600={guessState.userGuess !== 'replicant'}
 													class:text-white={guessState.userGuess === 'replicant'}
 													class:text-gray-400={guessState.userGuess !== 'replicant'}
@@ -379,7 +379,7 @@
 													{#if guessState.correct}
 														<span class="text-green-400">✅ {flatComment.is_ai ? 'Replicant identified' : 'Reddit origin confirmed'}.</span>
 													{:else}
-														<span class="text-red-400">❌ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
+														<span class="text-amber-400">❌ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
 													{/if}
 												</div>
 											</div>

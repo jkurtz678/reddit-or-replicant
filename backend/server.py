@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from src.reddit_parser import parse_reddit_json, select_representative_comments
 from src.reddit_fetcher import fetch_reddit_post, extract_post_info, validate_reddit_url
-from src.database import save_post, get_post_by_id, get_all_posts, post_exists
+from src.database import save_post, get_post_by_id, get_all_posts, post_exists, soft_delete_post, restore_post
 import anthropic
 from src.gen.generate_mixed_comments import (
     anonymize_usernames, apply_username_anonymization, count_all_comments,
@@ -25,6 +25,13 @@ app = FastAPI()
 # Pydantic models for request/response
 class SubmitURLRequest(BaseModel):
     url: str
+
+class AdminLoginRequest(BaseModel):
+    password: str
+
+class AdminLoginResponse(BaseModel):
+    token: str
+    message: str
 
 class PostResponse(BaseModel):
     id: int
@@ -169,11 +176,40 @@ def filter_comments_to_subset(comment_tree, target_flat_list):
 def read_root():
     return {"Hello": "World"}
 
+@app.post("/api/admin/login")
+def admin_login(request: AdminLoginRequest):
+    """Admin login endpoint"""
+    admin_password = os.getenv("ADMIN_PASSWORD", "admin123")  # Default for development
+    
+    if request.password == admin_password:
+        return AdminLoginResponse(
+            token="admin_authenticated",
+            message="Login successful"
+        )
+    else:
+        raise HTTPException(status_code=401, detail="Invalid admin password")
+
 @app.get("/api/posts")
-def get_posts():
+def get_posts(include_deleted: bool = False):
     """Get all saved posts"""
-    posts = get_all_posts()
+    posts = get_all_posts(include_deleted=include_deleted)
     return {"posts": posts}
+
+@app.post("/api/admin/posts/{post_id}/delete")
+def admin_delete_post(post_id: int):
+    """Soft delete a post (admin only)"""
+    if soft_delete_post(post_id):
+        return {"message": "Post deleted successfully", "post_id": post_id}
+    else:
+        raise HTTPException(status_code=404, detail="Post not found or already deleted")
+
+@app.post("/api/admin/posts/{post_id}/restore")
+def admin_restore_post(post_id: int):
+    """Restore a soft-deleted post (admin only)"""
+    if restore_post(post_id):
+        return {"message": "Post restored successfully", "post_id": post_id}
+    else:
+        raise HTTPException(status_code=404, detail="Post not found or not deleted")
 
 @app.post("/api/posts/submit")
 async def submit_reddit_url(request: SubmitURLRequest):

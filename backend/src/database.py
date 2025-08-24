@@ -23,7 +23,9 @@ def init_database():
                 mixed_comments_json TEXT NOT NULL,
                 ai_count INTEGER NOT NULL,
                 total_count INTEGER NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                deleted_at TIMESTAMP NULL,
+                is_deleted INTEGER DEFAULT 0
             )
         """)
         conn.commit()
@@ -79,14 +81,25 @@ def get_post_by_id(post_id: int) -> Optional[Dict]:
             }
         return None
 
-def get_all_posts() -> List[Dict]:
+def get_all_posts(include_deleted: bool = False) -> List[Dict]:
     """Get all posts (without full comment data for listing)"""
     with get_db_connection() as conn:
-        rows = conn.execute("""
-            SELECT id, reddit_url, title, subreddit, ai_count, total_count, created_at
-            FROM posts 
-            ORDER BY created_at DESC
-        """).fetchall()
+        if include_deleted:
+            # Admin view: show all posts including deleted ones
+            rows = conn.execute("""
+                SELECT id, reddit_url, title, subreddit, ai_count, total_count, 
+                       created_at, deleted_at, is_deleted
+                FROM posts 
+                ORDER BY created_at DESC
+            """).fetchall()
+        else:
+            # Public view: only show non-deleted posts
+            rows = conn.execute("""
+                SELECT id, reddit_url, title, subreddit, ai_count, total_count, created_at
+                FROM posts 
+                WHERE is_deleted = 0
+                ORDER BY created_at DESC
+            """).fetchall()
         
         return [dict(row) for row in rows]
 
@@ -98,8 +111,30 @@ def post_exists(reddit_url: str) -> bool:
         """, (reddit_url,)).fetchone()
         return row is not None
 
+def soft_delete_post(post_id: int) -> bool:
+    """Soft delete a post by ID"""
+    with get_db_connection() as conn:
+        cursor = conn.execute("""
+            UPDATE posts 
+            SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP 
+            WHERE id = ? AND is_deleted = 0
+        """, (post_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+
+def restore_post(post_id: int) -> bool:
+    """Restore a soft-deleted post by ID"""
+    with get_db_connection() as conn:
+        cursor = conn.execute("""
+            UPDATE posts 
+            SET is_deleted = 0, deleted_at = NULL 
+            WHERE id = ? AND is_deleted = 1
+        """, (post_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+
 def delete_post(post_id: int) -> bool:
-    """Delete a post by ID"""
+    """Hard delete a post by ID (kept for backwards compatibility)"""
     with get_db_connection() as conn:
         cursor = conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
         conn.commit()

@@ -202,7 +202,7 @@
 </script>
 
 <!-- Shader background canvas -->
-<canvas bind:this={canvas} class="fixed inset-0 w-full h-full" style="z-index: -1;"></canvas>
+<!-- <canvas bind:this={canvas} class="fixed inset-0 w-full h-full" style="z-index: -1;"></canvas> -->
 
 
 <div class="min-h-screen text-gray-100 flex items-center justify-center relative z-10">
@@ -223,9 +223,9 @@
 		<button 
 			on:click={takeTest}
 			class="px-8 py-4 text-white text-xl rounded transition-all duration-200 cursor-pointer hover:scale-105 font-semibold"
-			style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: 1px solid rgba(0, 212, 255, 0.3); box-shadow: 0 4px 15px rgba(0, 212, 255, 0.2);"
-			on:mouseenter={(e) => e.target.style.boxShadow = '0 6px 25px rgba(0, 212, 255, 0.4)'}
-			on:mouseleave={(e) => e.target.style.boxShadow = '0 4px 15px rgba(0, 212, 255, 0.2)'}
+			style="background: linear-gradient(135deg, #c2410c, #ff8c42); border: 1px solid rgba(255, 140, 66, 0.3); box-shadow: 0 4px 15px rgba(255, 140, 66, 0.2);"
+			on:mouseenter={(e) => e.target.style.boxShadow = '0 6px 25px rgba(255, 140, 66, 0.4)'}
+			on:mouseleave={(e) => e.target.style.boxShadow = '0 4px 15px rgba(255, 140, 66, 0.2)'}
 		>
 			Take the Test
 		</button>
