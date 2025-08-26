@@ -265,7 +265,7 @@
 							<span class="text-gray-300">{incorrectGuesses}</span>
 						</div>
 						<div class="flex items-center gap-2">
-							<span class="text-blue-400">Remaining:</span>
+							<span style="color: #00d4ff;">Remaining:</span>
 							<span class="text-gray-200 font-medium">{remainingGuesses}</span>
 						</div>
 					</div>
