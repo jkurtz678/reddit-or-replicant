@@ -547,8 +547,8 @@
 												</button>
 												<button 
 													class="px-2 py-1 text-white rounded text-xs transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer"
-													style="background: linear-gradient(135deg, #c2410c, #ff8c42); border: 1px solid rgba(255, 140, 66, 0.3);"
-													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 140, 66, 0.4)'}
+													style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
 													on:mouseleave={(e) => e.target.style.boxShadow = ''}
 													on:click={() => makeGuess(flatComment.id, 'replicant', flatComment.is_ai)}
 												>
@@ -570,7 +570,7 @@
 												</button>
 												<button 
 													class="px-2 py-1 rounded text-xs cursor-not-allowed"
-													class:bg-amber-700={guessState.userGuess === 'replicant'}
+													class:bg-red-700={guessState.userGuess === 'replicant'}
 													class:bg-gray-600={guessState.userGuess !== 'replicant'}
 													class:text-white={guessState.userGuess === 'replicant'}
 													class:text-gray-400={guessState.userGuess !== 'replicant'}
@@ -657,8 +657,8 @@
 					<a 
 						href="/selection"
 						class="px-4 py-2 text-white rounded transition-all duration-200 hover:scale-105 cursor-pointer inline-block text-center"
-						style="background: linear-gradient(135deg, #d2311c, #ff6b35); border: 1px solid rgba(255, 107, 53, 0.3);"
-						on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 107, 53, 0.4)'}
+						style="background: linear-gradient(135deg, var(--replicant-dark), var(--replicant-light)); border: 1px solid var(--replicant-border);"
+						on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
 						on:mouseleave={(e) => e.target.style.boxShadow = ''}
 					>
 						Next Test

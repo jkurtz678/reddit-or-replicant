@@ -205,8 +205,8 @@
 						<button 
 							on:click={openDialog}
 							class="px-4 py-2 text-white rounded transition-all duration-200 cursor-pointer hover:scale-105"
-							style="background: linear-gradient(135deg, #c2410c, #ff8c42); border: 1px solid rgba(255, 140, 66, 0.3);"
-							on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 140, 66, 0.4)'}
+							style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+							on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
 							on:mouseleave={(e) => e.target.style.boxShadow = ''}
 						>
 							+ Add New Post
@@ -236,8 +236,8 @@
 								<div class="ml-4 flex flex-col items-end">
 									<button 
 										class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer mb-2"
-										style="background: linear-gradient(135deg, {progressStatus === 'completed' ? '#d2311c, #ff6b35' : '#c2410c, #ff8c42'}); border: 1px solid rgba(255, 140, 66, 0.3);"
-										on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 140, 66, 0.4)'}
+										style="background: linear-gradient(135deg, {progressStatus === 'completed' ? 'var(--replicant-dark), var(--replicant-light)' : 'var(--replicant-primary), var(--replicant-secondary)'}); border: 1px solid var(--replicant-border);"
+										on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
 										on:mouseleave={(e) => e.target.style.boxShadow = ''}
 									>
 										{#if progressStatus === 'completed'}
@@ -266,8 +266,8 @@
 					<button 
 						on:click={openDialog}
 						class="px-6 py-3 text-white rounded transition-all duration-200 cursor-pointer hover:scale-105"
-						style="background: linear-gradient(135deg, #c2410c, #ff8c42); border: 1px solid rgba(255, 140, 66, 0.3);"
-						on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 140, 66, 0.4)'}
+						style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+						on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
 						on:mouseleave={(e) => e.target.style.boxShadow = ''}
 					>
 						+ Add Your First Post
@@ -324,8 +324,8 @@
 					on:click={submitRedditUrl}
 					disabled={submitting || !redditUrl.trim()}
 					class="px-4 py-2 text-white rounded transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
-					style="background: linear-gradient(135deg, #c2410c, #ff8c42); border: 1px solid rgba(255, 140, 66, 0.3);"
-					on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 140, 66, 0.4)'}
+					style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+					on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
 					on:mouseleave={(e) => e.target.style.boxShadow = ''}
 				>
 					{submitting ? 'Processing...' : 'Submit & Play'}

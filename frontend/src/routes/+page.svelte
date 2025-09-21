@@ -223,9 +223,9 @@
 		<button 
 			on:click={takeTest}
 			class="px-8 py-4 text-white text-xl rounded transition-all duration-200 cursor-pointer hover:scale-105 font-semibold"
-			style="background: linear-gradient(135deg, #c2410c, #ff8c42); border: 1px solid rgba(255, 140, 66, 0.3); box-shadow: 0 4px 15px rgba(255, 140, 66, 0.2);"
-			on:mouseenter={(e) => e.target.style.boxShadow = '0 6px 25px rgba(255, 140, 66, 0.4)'}
-			on:mouseleave={(e) => e.target.style.boxShadow = '0 4px 15px rgba(255, 140, 66, 0.2)'}
+			style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border); box-shadow: 0 4px 15px var(--replicant-shadow);"
+			on:mouseenter={(e) => e.target.style.boxShadow = '0 6px 25px var(--replicant-glow)'}
+			on:mouseleave={(e) => e.target.style.boxShadow = '0 4px 15px var(--replicant-shadow)'}
 		>
 			Take the Test
 		</button>

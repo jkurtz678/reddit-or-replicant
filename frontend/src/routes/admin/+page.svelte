@@ -76,8 +76,8 @@
 					on:click={handleLogin}
 					disabled={loading || !password.trim()}
 					class="w-full px-4 py-2 text-white rounded transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
-					style="background: linear-gradient(135deg, #c2410c, #ff8c42); border: 1px solid rgba(255, 140, 66, 0.3);"
-					on:mouseenter={(e) => !loading && !e.target.disabled && (e.target.style.boxShadow = '0 0 15px rgba(255, 140, 66, 0.4)')}
+					style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+					on:mouseenter={(e) => !loading && !e.target.disabled && (e.target.style.boxShadow = '0 0 15px var(--replicant-glow)')}
 					on:mouseleave={(e) => e.target.style.boxShadow = ''}
 				>
 					{loading ? 'Authenticating...' : 'Login'}
