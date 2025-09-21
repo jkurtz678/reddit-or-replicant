@@ -236,7 +236,7 @@
 								<div class="ml-4 flex flex-col items-end">
 									<button 
 										class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer mb-2"
-										style="background: linear-gradient(135deg, {progressStatus === 'completed' ? 'var(--replicant-dark), var(--replicant-light)' : 'var(--replicant-primary), var(--replicant-secondary)'}); border: 1px solid var(--replicant-border);"
+										style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
 										on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
 										on:mouseleave={(e) => e.target.style.boxShadow = ''}
 									>
