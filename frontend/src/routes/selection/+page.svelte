@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { adminSession } from '$lib/admin';
+	import { userManager } from '$lib/user';
+	import { browser } from '$app/environment';
 
 	interface PostListItem {
 		id: number;
@@ -12,6 +14,12 @@
 		total_count: number;
 		created_at: string;
 	}
+	
+	interface UserProgress {
+		total_guesses: number;
+		correct_guesses: number;
+		accuracy: number;
+	}
 
 	let posts: PostListItem[] = [];
 	let loading = true;
@@ -20,6 +28,9 @@
 	let redditUrl = '';
 	let showSubmitDialog = false;
 	let dialogVisible = false;
+	let userProgress: Record<number, UserProgress> = {};
+	let anonymousUserId = '';
+	let progressLoaded = false;
 
 	// Check if user is admin
 	$: isAdmin = adminSession.isAdmin();
@@ -36,6 +47,16 @@
 		setTimeout(() => showSubmitDialog = false, 300); // Wait for fade out
 	}
 
+	// Initialize user ID when in browser
+	$: if (browser && !anonymousUserId) {
+		anonymousUserId = userManager.getUserId();
+	}
+	
+	// Load user progress when user ID is available and not already loaded
+	$: if (browser && anonymousUserId && !progressLoaded) {
+		loadUserProgress();
+	}
+	
 	// Load the list of posts on page mount
 	onMount(async () => {
 		await loadPosts();
@@ -54,6 +75,46 @@
 		} finally {
 			loading = false;
 		}
+	}
+	
+	async function loadUserProgress() {
+		if (!browser || !anonymousUserId || progressLoaded) return;
+		
+		try {
+			const response = await fetch(`/api/users/${anonymousUserId}/progress`);
+			if (!response.ok) {
+				console.error('Failed to load user progress');
+				return;
+			}
+			
+			const data = await response.json();
+			userProgress = data.progress || {};
+			progressLoaded = true;
+			
+		} catch (err) {
+			console.error('Error loading user progress:', err);
+		}
+	}
+	
+	// Function to get progress status for a post
+	function getProgressStatus(postId: number, totalComments: number): 'not-started' | 'in-progress' | 'completed' {
+		const progress = userProgress[postId];
+		if (!progress || progress.total_guesses === 0) {
+			return 'not-started';
+		}
+		if (progress.total_guesses >= totalComments) {
+			return 'completed';
+		}
+		return 'in-progress';
+	}
+	
+	// Function to get progress percentage
+	function getProgressPercentage(postId: number, totalComments: number): number {
+		const progress = userProgress[postId];
+		if (!progress || progress.total_guesses === 0) {
+			return 0;
+		}
+		return Math.round((progress.total_guesses / totalComments) * 100);
 	}
 
 	async function submitRedditUrl() {
@@ -83,6 +144,11 @@
 			redditUrl = '';
 			closeDialog();
 			await loadPosts();
+			
+			// Reload progress if we have a user ID
+			if (browser && anonymousUserId) {
+				progressLoaded = false; // This will trigger reactive reload
+			}
 			
 			// Navigate to the test page with the new post
 			if (result.id) {
@@ -149,6 +215,8 @@
 				</div>
 				<div class="grid gap-4">
 					{#each posts as post}
+						{@const progressStatus = getProgressStatus(post.id, post.total_count)}
+						{@const userPostProgress = userProgress[post.id]}
 						<div 
 							class="border border-gray-700 rounded-lg p-6 cursor-pointer transition-all duration-200 hover:border-blue-400 hover:scale-[1.02]"
 							style="background: rgba(17, 17, 20, 0.85); backdrop-filter: blur(10px);"
@@ -165,15 +233,26 @@
 										• {post.total_count} comments
 									</div>
 								</div>
-								<div class="ml-4">
+								<div class="ml-4 flex flex-col items-end">
 									<button 
-										class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
-										style="background: linear-gradient(135deg, #c2410c, #ff8c42); border: 1px solid rgba(255, 140, 66, 0.3);"
+										class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer mb-2"
+										style="background: linear-gradient(135deg, {progressStatus === 'completed' ? '#d2311c, #ff6b35' : '#c2410c, #ff8c42'}); border: 1px solid rgba(255, 140, 66, 0.3);"
 										on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 140, 66, 0.4)'}
 										on:mouseleave={(e) => e.target.style.boxShadow = ''}
 									>
-										Begin Test
+										{#if progressStatus === 'completed'}
+											Review ({Math.round(userPostProgress.accuracy * 100)}% accuracy)
+										{:else if progressStatus === 'in-progress'}
+											Continue
+										{:else}
+											Begin Test
+										{/if}
 									</button>
+									{#if userPostProgress && userPostProgress.total_guesses > 0}
+										<div class="text-xs text-gray-400">
+											{userPostProgress.total_guesses} guessed ({userPostProgress.correct_guesses} correct)
+										</div>
+									{/if}
 								</div>
 							</div>
 						</div>

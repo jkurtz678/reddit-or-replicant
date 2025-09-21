@@ -1,9 +1,13 @@
+import { browser } from '$app/environment';
+
 // Simple admin session management using localStorage
 export const adminSession = {
 	/**
 	 * Attempt to login with admin password
 	 */
 	async login(password: string): Promise<boolean> {
+		if (!browser) return false;
+		
 		try {
 			const response = await fetch('/api/admin/login', {
 				method: 'POST',
@@ -29,13 +33,17 @@ export const adminSession = {
 	 * Logout and clear admin session
 	 */
 	logout(): void {
-		localStorage.removeItem('admin_token');
+		if (browser) {
+			localStorage.removeItem('admin_token');
+		}
 	},
 
 	/**
 	 * Check if current user is admin
 	 */
 	isAdmin(): boolean {
+		if (!browser) return false;
+		
 		const token = localStorage.getItem('admin_token');
 		return token === 'admin_authenticated';
 	},
@@ -44,6 +52,8 @@ export const adminSession = {
 	 * Get admin token for API requests
 	 */
 	getToken(): string | null {
+		if (!browser) return null;
+		
 		return localStorage.getItem('admin_token');
 	}
 };

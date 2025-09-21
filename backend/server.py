@@ -11,7 +11,10 @@ from dotenv import load_dotenv
 load_dotenv()
 from src.reddit_parser import parse_reddit_json, select_representative_comments
 from src.reddit_fetcher import fetch_reddit_post, extract_post_info, validate_reddit_url
-from src.database import save_post, get_post_by_id, get_all_posts, post_exists, soft_delete_post, restore_post
+from src.database import (
+    save_post, get_post_by_id, get_all_posts, post_exists, soft_delete_post, restore_post,
+    get_or_create_user, save_user_guess, get_user_progress, get_user_all_progress, reset_user_progress
+)
 import anthropic
 from src.gen.generate_mixed_comments import (
     anonymize_usernames, apply_username_anonymization, count_all_comments,
@@ -32,6 +35,24 @@ class AdminLoginRequest(BaseModel):
 class AdminLoginResponse(BaseModel):
     token: str
     message: str
+
+class UserRegisterRequest(BaseModel):
+    anonymous_id: str
+
+class UserGuessRequest(BaseModel):
+    anonymous_id: str
+    post_id: int
+    comment_id: str
+    guess: str
+    is_correct: bool
+
+class UserProgressRequest(BaseModel):
+    anonymous_id: str
+    post_id: int
+
+class ResetProgressRequest(BaseModel):
+    anonymous_id: str
+    post_id: int
 
 class PostResponse(BaseModel):
     id: int
@@ -210,6 +231,76 @@ def admin_restore_post(post_id: int):
         return {"message": "Post restored successfully", "post_id": post_id}
     else:
         raise HTTPException(status_code=404, detail="Post not found or not deleted")
+
+# User tracking endpoints
+
+@app.post("/api/users/register")
+def register_user(request: UserRegisterRequest):
+    """Register a new anonymous user"""
+    try:
+        user_id = get_or_create_user(request.anonymous_id)
+        return {"message": "User registered successfully", "user_id": user_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to register user: {str(e)}")
+
+@app.post("/api/users/guess")
+def save_guess(request: UserGuessRequest):
+    """Save a user's guess for a comment"""
+    try:
+        # Get or create user
+        user_id = get_or_create_user(request.anonymous_id)
+        
+        # Save the guess
+        success = save_user_guess(
+            user_id=user_id,
+            post_id=request.post_id, 
+            comment_id=request.comment_id,
+            guess=request.guess,
+            is_correct=request.is_correct
+        )
+        
+        if success:
+            return {"message": "Guess saved successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save guess")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save guess: {str(e)}")
+
+@app.post("/api/users/progress")
+def get_progress(request: UserProgressRequest):
+    """Get user's progress on a specific post"""
+    try:
+        user_id = get_or_create_user(request.anonymous_id)
+        progress = get_user_progress(user_id, request.post_id)
+        return progress
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get progress: {str(e)}")
+
+@app.get("/api/users/{anonymous_id}/progress")
+def get_all_progress(anonymous_id: str):
+    """Get user's progress across all posts"""
+    try:
+        user_id = get_or_create_user(anonymous_id)
+        progress = get_user_all_progress(user_id)
+        return {"progress": progress}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get progress: {str(e)}")
+
+@app.post("/api/users/reset-progress")
+def reset_progress(request: ResetProgressRequest):
+    """Reset user's progress on a specific post"""
+    try:
+        user_id = get_or_create_user(request.anonymous_id)
+        success = reset_user_progress(user_id, request.post_id)
+        
+        if success:
+            return {"message": "Progress reset successfully"}
+        else:
+            return {"message": "No progress found to reset"}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reset progress: {str(e)}")
 
 @app.post("/api/posts/submit")
 async def submit_reddit_url(request: SubmitURLRequest):

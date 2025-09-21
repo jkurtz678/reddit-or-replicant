@@ -2,6 +2,8 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/stores';
 	import { fade } from 'svelte/transition';
+	import { userManager } from '$lib/user';
+	import { browser } from '$app/environment';
 
 	// Glitch character pool - only ASCII characters that are truly monospace
 	const glitchChars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|\\;:,.<>?/~`';
@@ -40,13 +42,31 @@
 	let redditData: RedditData | null = null;
 	let loading = true;
 	let error = '';
+	let currentPostId: number | null = null;
+	let anonymousUserId: string = '';
+	let progressLoaded = false;
+	let showResultsDialog = false;
+	let resultsDialogVisible = false;
+	let resultsShown = false;
+	let justMadeGuess = false;
 
+	// Initialize user ID when in browser
+	$: if (browser && !anonymousUserId) {
+		anonymousUserId = userManager.getUserId();
+	}
+	
+	// Load user progress when both post and user are available
+	$: if (browser && anonymousUserId && currentPostId && !progressLoaded) {
+		loadUserProgress();
+	}
+	
 	// Load post data only if post ID is provided in URL
 	onMount(async () => {
 		const postId = $page.url.searchParams.get('post');
 		
 		if (postId) {
-			await loadPost(parseInt(postId));
+			currentPostId = parseInt(postId);
+			await loadPost(currentPostId);
 		} else {
 			loading = false;
 			error = 'No post specified. Visit /selection to add Reddit posts.';
@@ -69,7 +89,7 @@
 			
 			redditData = data;
 			
-			// Reset guessing state
+			// Reset guessing state (will be restored from backend if exists)
 			guessedComments = new Map();
 			
 		} catch (err: any) {
@@ -78,6 +98,134 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	async function loadUserProgress() {
+		if (!browser || !currentPostId || !anonymousUserId || progressLoaded) return;
+		
+		try {
+			const response = await fetch('/api/users/progress', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					anonymous_id: anonymousUserId,
+					post_id: currentPostId
+				})
+			});
+			
+			if (!response.ok) {
+				console.error('Failed to load user progress');
+				return;
+			}
+			
+			const progress = await response.json();
+			progressLoaded = true;
+			
+			// Restore guessing state from backend
+			if (progress.guesses && progress.guesses.length > 0) {
+				for (const guess of progress.guesses) {
+					guessedComments.set(guess.comment_id, {
+						guessed: true,
+						correct: guess.is_correct,
+						userGuess: guess.guess as 'reddit' | 'replicant'
+					});
+					
+					// Restart text glitching for AI comments that were already guessed
+					if (redditData) {
+						const comment = getAllCommentsFlat(redditData.comments).find(c => c.id === guess.comment_id);
+						if (comment && comment.is_ai) {
+							setTimeout(() => startTextGlitch(guess.comment_id, comment.content), 100);
+						}
+					}
+				}
+				
+				// Trigger reactivity
+				guessedComments = guessedComments;
+			}
+			
+		} catch (err) {
+			console.error('Error loading user progress:', err);
+		}
+	}
+
+	async function resetProgress() {
+		if (!browser || !currentPostId || !anonymousUserId) return;
+		
+		if (!confirm('Are you sure you want to reset your progress on this post? This will clear all your guesses.')) {
+			return;
+		}
+		
+		try {
+			const response = await fetch('/api/users/reset-progress', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					anonymous_id: anonymousUserId,
+					post_id: currentPostId
+				})
+			});
+			
+			if (!response.ok) {
+				throw new Error('Failed to reset progress');
+			}
+			
+			// Clear local state
+			guessedComments.clear();
+			guessedComments = guessedComments;
+			progressLoaded = false; // Allow progress to be reloaded
+			resultsShown = false; // Allow results to show again after reset
+			justMadeGuess = false; // Reset guess flag
+			
+			// Stop all text glitching
+			glitchIntervals.forEach(timeout => clearTimeout(timeout));
+			glitchIntervals.clear();
+			originalTexts.clear();
+			
+			// Reset all glitch effects in DOM
+			const allGlitchTexts = document.querySelectorAll('.glitch-text');
+			allGlitchTexts.forEach(element => {
+				element.classList.remove('glitching', 'glitch');
+			});
+			
+			alert('Progress reset successfully!');
+			
+		} catch (err) {
+			console.error('Error resetting progress:', err);
+			alert('Failed to reset progress. Please try again.');
+		}
+	}
+	
+	// Get result message based on accuracy
+	function getResultMessage(accuracy: number): string {
+		if (accuracy >= 0.9) {
+			return "Exceptional. Your detection algorithms are operating at near-human levels. The line between artificial and authentic continues to blur.";
+		} else if (accuracy >= 0.8) {
+			return "Impressive performance. You've shown remarkable ability to distinguish replicants from humans, but some still slip through undetected.";
+		} else if (accuracy >= 0.7) {
+			return "Adequate detection rate. Your instincts serve you well, though several replicants have successfully mimicked human discourse.";
+		} else if (accuracy >= 0.6) {
+			return "Concerning results. The replicants are evolving faster than our ability to detect them. More training is required.";
+		} else if (accuracy >= 0.5) {
+			return "Barely better than random chance. The replicants have learned to perfectly imitate human communication patterns. We may already be outnumbered.";
+		} else {
+			return "Critical failure. Your inability to distinguish humans from replicants poses a significant threat to the mission. Immediate recalibration recommended.";
+		}
+	}
+	
+	// Close results dialog
+	function closeResultsDialog() {
+		resultsDialogVisible = false;
+		setTimeout(() => showResultsDialog = false, 300);
+	}
+	
+	// Show results dialog manually
+	function showResults() {
+		showResultsDialog = true;
+		setTimeout(() => resultsDialogVisible = true, 10);
 	}
 
 	// Track guessing state for each comment
@@ -90,6 +238,18 @@
 	$: incorrectGuesses = guessedArray.filter(g => !g.correct).length;
 	$: totalGuessed = guessedArray.length;
 	$: remainingGuesses = totalComments - totalGuessed;
+	$: accuracy = totalGuessed > 0 ? (correctGuesses / totalGuessed) : 0;
+	
+	// Check if all comments have been guessed and show results (only if just made a guess)
+	$: if (totalComments > 0 && remainingGuesses === 0 && totalGuessed > 0 && !resultsShown && justMadeGuess) {
+		// Wait 1 second before showing results
+		setTimeout(() => {
+			showResultsDialog = true;
+			setTimeout(() => resultsDialogVisible = true, 10);
+			justMadeGuess = false; // Reset the flag after showing
+		}, 1000);
+		resultsShown = true;
+	}
 
 	function getAllCommentsFlat(comments: Comment[]): Comment[] {
 		const flat: Comment[] = [];
@@ -189,7 +349,7 @@
 		}
 	}
 
-	function makeGuess(commentId: string, guess: 'reddit' | 'replicant', actualIsAi: boolean) {
+	async function makeGuess(commentId: string, guess: 'reddit' | 'replicant', actualIsAi: boolean) {
 		const correct = (guess === 'replicant' && actualIsAi) || (guess === 'reddit' && !actualIsAi);
 		
 		guessedComments.set(commentId, {
@@ -198,8 +358,32 @@
 			userGuess: guess
 		});
 		
+		// Mark that a guess was just made
+		justMadeGuess = true;
+		
 		// Trigger reactivity
 		guessedComments = guessedComments;
+		
+		// Save guess to backend (only in browser with valid user ID)
+		if (browser && currentPostId && anonymousUserId) {
+			try {
+				await fetch('/api/users/guess', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						anonymous_id: anonymousUserId,
+						post_id: currentPostId,
+						comment_id: commentId,
+						guess: guess,
+						is_correct: correct
+					})
+				});
+			} catch (err) {
+				console.error('Failed to save guess:', err);
+			}
+		}
 		
 		// Start text glitching for AI comments
 		if (actualIsAi) {
@@ -264,10 +448,31 @@
 							<span style="color: #f87171;">✗</span>
 							<span class="text-gray-300">{incorrectGuesses}</span>
 						</div>
-						<div class="flex items-center gap-2">
-							<span style="color: #00d4ff;">Remaining:</span>
-							<span class="text-gray-200 font-medium">{remainingGuesses}</span>
-						</div>
+						{#if remainingGuesses > 0}
+							<div class="flex items-center gap-2">
+								<span style="color: #00d4ff;">Remaining:</span>
+								<span class="text-gray-200 font-medium">{remainingGuesses}</span>
+							</div>
+						{:else if totalGuessed > 0}
+							<button 
+								on:click={showResults}
+								class="px-2 py-1 text-xs rounded transition-all duration-200 hover:scale-105 cursor-pointer"
+								style="background: rgba(0, 212, 255, 0.2); color: #00d4ff; border: 1px solid rgba(0, 212, 255, 0.3);"
+								title="View your final results"
+							>
+								Review Results
+							</button>
+						{/if}
+						{#if totalGuessed > 0}
+							<button 
+								on:click={resetProgress}
+								class="px-2 py-1 text-xs rounded transition-all duration-200 hover:scale-105 cursor-pointer"
+								style="background: rgba(248, 113, 113, 0.2); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.3);"
+								title="Reset all progress on this post"
+							>
+								Reset
+							</button>
+						{/if}
 					</div>
 				</div>
 			</div>
@@ -393,3 +598,73 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Results Dialog -->
+{#if showResultsDialog}
+	<div 
+		class="fixed inset-0 flex items-center justify-center z-50 transition-opacity duration-300"
+		class:opacity-0={!resultsDialogVisible}
+		class:opacity-100={resultsDialogVisible}
+		style="background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px);"
+		on:click={closeResultsDialog}
+	>
+		<div 
+			class="border border-gray-700 rounded-lg p-8 m-4 max-w-2xl w-full transform transition-all duration-300"
+			class:scale-95={!resultsDialogVisible}
+			class:opacity-0={!resultsDialogVisible}
+			class:scale-100={resultsDialogVisible}
+			class:opacity-100={resultsDialogVisible}
+			style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);"
+			on:click|stopPropagation
+		>
+			<div class="text-center">
+				<h2 class="text-2xl font-bold mb-6" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">
+					Detection <span class="glitch" data-text="Complete">Complete</span>
+				</h2>
+				
+				<!-- Results Stats -->
+				<div class="grid grid-cols-3 gap-6 mb-8">
+					<div class="text-center">
+						<div class="text-3xl font-bold mb-2" style="color: #4ade80;">{correctGuesses}</div>
+						<div class="text-sm text-gray-400">Correct</div>
+					</div>
+					<div class="text-center">
+						<div class="text-3xl font-bold mb-2" style="color: #f87171;">{incorrectGuesses}</div>
+						<div class="text-sm text-gray-400">Incorrect</div>
+					</div>
+					<div class="text-center">
+						<div class="text-3xl font-bold mb-2" style="color: #00d4ff;">{Math.round(accuracy * 100)}%</div>
+						<div class="text-sm text-gray-400">Accuracy</div>
+					</div>
+				</div>
+				
+				<!-- Assessment Message -->
+				<div class="mb-8 p-4 rounded-lg border border-gray-600" style="background: rgba(31, 31, 35, 0.6);">
+					<p class="text-gray-200 leading-relaxed">
+						{getResultMessage(accuracy)}
+					</p>
+				</div>
+				
+				<!-- Action Buttons -->
+				<div class="flex justify-end gap-3">
+					<button 
+						on:click={closeResultsDialog}
+						class="px-4 py-2 text-white rounded transition-all duration-200 hover:scale-105 cursor-pointer"
+						style="background: #4b5563; border: 1px solid #6b7280;"
+					>
+						Close
+					</button>
+					<a 
+						href="/selection"
+						class="px-4 py-2 text-white rounded transition-all duration-200 hover:scale-105 cursor-pointer inline-block text-center"
+						style="background: linear-gradient(135deg, #d2311c, #ff6b35); border: 1px solid rgba(255, 107, 53, 0.3);"
+						on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(255, 107, 53, 0.4)'}
+						on:mouseleave={(e) => e.target.style.boxShadow = ''}
+					>
+						Next Test
+					</a>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
