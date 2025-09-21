@@ -15,7 +15,7 @@
 					Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
 				</a>
 				<div class="flex items-center gap-4">
-					<a href="/selection" class="text-blue-400 hover:text-blue-300 transition-colors text-sm">
+					<a href="/subreddit" class="transition-colors text-sm" style="color: #00d4ff;" >
 						Play Game
 					</a>
 				</div>
@@ -54,7 +54,7 @@
 
 					<p class="text-center pt-8">
 						<a 
-							href="/selection" 
+							href="/subreddit" 
 							class="px-8 py-4 text-white text-xl rounded transition-all duration-200 cursor-pointer hover:scale-105 font-semibold inline-block"
 							style="background: linear-gradient(135deg, var(--replicant-dark), var(--replicant-light)); border: 1px solid var(--replicant-border); box-shadow: 0 4px 15px var(--replicant-shadow);"
 							on:mouseenter={(e) => e.target.style.boxShadow = '0 6px 25px var(--replicant-glow)'}

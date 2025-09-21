@@ -45,6 +45,7 @@
 	let currentPostId: number | null = null;
 	let anonymousUserId: string = '';
 	let progressLoaded = false;
+	let currentSubreddit: string = '';
 	let showResultsDialog = false;
 	let resultsDialogVisible = false;
 	let resultsShown = false;
@@ -69,7 +70,7 @@
 			await loadPost(currentPostId);
 		} else {
 			loading = false;
-			error = 'No post specified. Visit /selection to add Reddit posts.';
+			error = 'No post specified. Visit /subreddit to choose a community.';
 		}
 	});
 
@@ -88,6 +89,7 @@
 			const data = await response.json();
 			
 			redditData = data;
+			currentSubreddit = data.post?.subreddit || '';
 			
 			// Reset guessing state (will be restored from backend if exists)
 			guessedComments = new Map();
@@ -418,8 +420,8 @@
 		<div class="flex items-center justify-center min-h-screen">
 			<div class="text-center">
 				<div class="text-amber-400 mb-4">{error}</div>
-				<a href="/selection" class="px-4 py-2 text-white rounded transition-all duration-200 hover:scale-105" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: 1px solid rgba(0, 212, 255, 0.3);">
-					Go to Selection Page
+				<a href="/subreddit" class="px-4 py-2 text-white rounded transition-all duration-200 hover:scale-105" style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); border: 1px solid rgba(0, 212, 255, 0.3);">
+					Choose Community
 				</a>
 			</div>
 		</div>
@@ -430,7 +432,7 @@
 				<div class="flex items-center justify-between">
 					<!-- Back Button & Title -->
 					<div class="flex items-center gap-4">
-						<a href="/selection" class="transition-colors flex items-center gap-1" style="color: #00d4ff;" on:mouseenter={(e) => e.target.style.color='#33e0ff'} on:mouseleave={(e) => e.target.style.color='#00d4ff'}>
+						<a href={currentSubreddit ? `/subreddit/${currentSubreddit}` : '/subreddit'} class="transition-colors flex items-center gap-1" style="color: #00d4ff;" on:mouseenter={(e) => e.target.style.color='#33e0ff'} on:mouseleave={(e) => e.target.style.color='#00d4ff'}>
 							← Back
 						</a>
 						<h1 class="text-lg font-bold" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
@@ -655,7 +657,7 @@
 						Close
 					</button>
 					<a 
-						href="/selection"
+						href="/subreddit"
 						class="px-4 py-2 text-white rounded transition-all duration-200 hover:scale-105 cursor-pointer inline-block text-center"
 						style="background: linear-gradient(135deg, var(--replicant-dark), var(--replicant-light)); border: 1px solid var(--replicant-border);"
 						on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}

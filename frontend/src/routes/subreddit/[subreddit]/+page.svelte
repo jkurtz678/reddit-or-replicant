@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { adminSession } from '$lib/admin';
 	import { userManager } from '$lib/user';
 	import { browser } from '$app/environment';
@@ -31,9 +32,28 @@
 	let userProgress: Record<number, UserProgress> = {};
 	let anonymousUserId = '';
 	let progressLoaded = false;
+	let currentSubreddit = '';
+
+	// Get subreddit from URL params
+	$: currentSubreddit = $page.params.subreddit || '';
+
+	// Load posts when subreddit changes
+	$: if (currentSubreddit) {
+		loadPosts();
+	}
 
 	// Check if user is admin
 	$: isAdmin = adminSession.isAdmin();
+
+	// Initialize user ID when in browser
+	$: if (browser && !anonymousUserId) {
+		anonymousUserId = userManager.getUserId();
+	}
+	
+	// Load user progress when user ID is available and not already loaded
+	$: if (browser && anonymousUserId && !progressLoaded) {
+		loadUserProgress();
+	}
 
 	// Handle dialog opening with transition
 	function openDialog() {
@@ -47,36 +67,37 @@
 		setTimeout(() => showSubmitDialog = false, 300); // Wait for fade out
 	}
 
-	// Initialize user ID when in browser
-	$: if (browser && !anonymousUserId) {
-		anonymousUserId = userManager.getUserId();
-	}
-	
-	// Load user progress when user ID is available and not already loaded
-	$: if (browser && anonymousUserId && !progressLoaded) {
-		loadUserProgress();
-	}
-	
-	// Load the list of posts on page mount
+	// Load posts on mount
 	onMount(async () => {
+		// Wait a tick for reactive statements to run
+		await new Promise(resolve => setTimeout(resolve, 0));
 		await loadPosts();
 	});
 
 	async function loadPosts() {
+		if (!currentSubreddit) {
+			console.log('No currentSubreddit, skipping load');
+			return;
+		}
+		
+		console.log('Loading posts for subreddit:', currentSubreddit);
+		
 		try {
 			loading = true;
-			const response = await fetch('/api/posts');
+			const response = await fetch(`/api/posts/subreddit/${currentSubreddit}`);
 			if (!response.ok) throw new Error('Failed to fetch posts');
 			const data = await response.json();
+			console.log('Received data:', data);
 			posts = data.posts || [];
+			console.log('Set posts to:', posts);
 		} catch (err) {
 			error = 'Failed to load posts';
-			console.error(err);
+			console.error('Error loading posts:', err);
 		} finally {
 			loading = false;
 		}
 	}
-	
+
 	async function loadUserProgress() {
 		if (!browser || !anonymousUserId || progressLoaded) return;
 		
@@ -106,15 +127,6 @@
 			return 'completed';
 		}
 		return 'in-progress';
-	}
-	
-	// Function to get progress percentage
-	function getProgressPercentage(postId: number, totalComments: number): number {
-		const progress = userProgress[postId];
-		if (!progress || progress.total_guesses === 0) {
-			return 0;
-		}
-		return Math.round((progress.total_guesses / totalComments) * 100);
 	}
 
 	async function submitRedditUrl() {
@@ -166,24 +178,48 @@
 	function playGame(postId: number) {
 		goto(`/test?post=${postId}`);
 	}
+
+	// Get display name for subreddit
+	function getSubredditDisplayName(subreddit: string): string {
+		const displayMap: Record<string, string> = {
+			'unpopularopinion': 'r/unpopularopinion',
+			'AmItheAsshole': 'r/AmItheAsshole', 
+			'relationship_advice': 'r/relationship_advice'
+		};
+		return displayMap[subreddit] || `r/${subreddit}`;
+	}
 </script>
+
+<svelte:head>
+	<title>{getSubredditDisplayName(currentSubreddit)} - Reddit or Replicant</title>
+</svelte:head>
 
 <div class="min-h-screen text-gray-100" style="background: linear-gradient(180deg, #0a0a0b 0%, #111013 100%)">
 	<!-- Fixed Toolbar -->
 	<div class="fixed top-0 left-0 right-0 z-50 border-b border-gray-700" style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);">
 		<div class="max-w-4xl mx-auto px-4 md:px-0 py-3">
 			<div class="flex items-center justify-between">
-				<a href="/" class="text-lg font-bold cursor-pointer hover:text-blue-300 transition-colors" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
-					Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
-				</a>
-				{#if isAdmin}
-					<div class="flex items-center gap-2">
-						<span class="text-sm text-amber-400">Admin</span>
-						<a href="/admin/posts" class="text-sm text-blue-400 hover:text-blue-300 transition-colors">
-							Manage
-						</a>
-					</div>
-				{/if}
+				<div class="flex items-center gap-4">
+					<a href="/subreddit" class="transition-colors flex items-center gap-1" style="color: #00d4ff;" >
+						← Back
+					</a>
+					<a href="/" class="text-lg font-bold cursor-pointer hover:text-blue-300 transition-colors" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
+						Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
+					</a>
+				</div>
+				<div class="flex items-center gap-4">
+					<a href="/about" class="transition-colors text-sm" style="color: #00d4ff;" >
+						About
+					</a>
+					{#if isAdmin}
+						<div class="flex items-center gap-2">
+							<span class="text-sm text-amber-400">Admin</span>
+							<a href="/admin/posts" class="text-sm transition-colors hover:text-blue-300" style="color: #00d4ff;">
+								Manage
+							</a>
+						</div>
+					{/if}
+				</div>
 			</div>
 		</div>
 	</div>
@@ -200,7 +236,9 @@
 		{:else if posts.length > 0}
 			<div class="max-w-4xl mx-auto">
 				<div class="flex justify-between items-center mb-6">
-					<h2 class="text-xl font-semibold text-white">Replicants are hiding among these Reddit posts</h2>
+					<h2 class="text-xl font-semibold text-white">
+						Replicants hiding in {getSubredditDisplayName(currentSubreddit)}
+					</h2>
 					{#if isAdmin}
 						<button 
 							on:click={openDialog}
@@ -260,24 +298,22 @@
 				</div>
 			</div>
 		{:else}
-			<div class="text-center text-gray-400">
-				{#if isAdmin}
-					<p class="mb-4">No posts yet. Add your first Reddit post to get started!</p>
-					<button 
-						on:click={openDialog}
-						class="px-6 py-3 text-white rounded transition-all duration-200 cursor-pointer hover:scale-105"
-						style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
-						on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
-						on:mouseleave={(e) => e.target.style.boxShadow = ''}
-					>
-						+ Add Your First Post
-					</button>
-				{:else}
-					<p class="mb-4">No posts available yet. Check back soon!</p>
-					<div class="text-sm text-gray-500">
-						Posts will be curated and added by our team for the best experience.
-					</div>
-				{/if}
+			<div class="text-center text-gray-400 max-w-2xl mx-auto">
+				<h2 class="text-xl font-semibold mb-4 text-white">
+					No posts found in {getSubredditDisplayName(currentSubreddit)}
+				</h2>
+				<p class="mb-6">
+					There are currently no posts available for this subreddit. Check back later or try a different community.
+				</p>
+				<a 
+					href="/subreddit" 
+					class="px-6 py-3 text-white rounded transition-all duration-200 cursor-pointer hover:scale-105 inline-block"
+					style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+					on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
+					on:mouseleave={(e) => e.target.style.boxShadow = ''}
+				>
+					← Choose Different Community
+				</a>
 			</div>
 		{/if}
 	</div>

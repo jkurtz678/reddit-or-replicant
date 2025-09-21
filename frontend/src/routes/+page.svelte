@@ -6,7 +6,7 @@
 	let animationId: number;
 
 	function takeTest() {
-		goto('/selection');
+		goto('/subreddit');
 	}
 
 	onMount(() => {

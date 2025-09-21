@@ -12,7 +12,7 @@ load_dotenv()
 from src.reddit_parser import parse_reddit_json, select_representative_comments
 from src.reddit_fetcher import fetch_reddit_post, extract_post_info, validate_reddit_url
 from src.database import (
-    save_post, get_post_by_id, get_all_posts, post_exists, soft_delete_post, restore_post,
+    save_post, get_post_by_id, get_all_posts, get_posts_by_subreddit, post_exists, soft_delete_post, restore_post,
     get_or_create_user, save_user_guess, get_user_progress, get_user_all_progress, reset_user_progress
 )
 import anthropic
@@ -215,6 +215,12 @@ def get_posts(include_deleted: bool = False):
     """Get all saved posts"""
     posts = get_all_posts(include_deleted=include_deleted)
     return {"posts": posts}
+
+@app.get("/api/posts/subreddit/{subreddit}")
+def get_posts_by_subreddit_endpoint(subreddit: str, include_deleted: bool = False):
+    """Get posts filtered by subreddit"""
+    posts = get_posts_by_subreddit(subreddit, include_deleted=include_deleted)
+    return {"posts": posts, "subreddit": subreddit}
 
 @app.post("/api/admin/posts/{post_id}/delete")
 def admin_delete_post(post_id: int):

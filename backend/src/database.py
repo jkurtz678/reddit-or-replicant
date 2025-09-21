@@ -129,6 +129,29 @@ def get_all_posts(include_deleted: bool = False) -> List[Dict]:
         
         return [dict(row) for row in rows]
 
+def get_posts_by_subreddit(subreddit: str, include_deleted: bool = False) -> List[Dict]:
+    """Get posts filtered by subreddit (without full comment data for listing)"""
+    with get_db_connection() as conn:
+        if include_deleted:
+            # Admin view: show all posts including deleted ones
+            rows = conn.execute("""
+                SELECT id, reddit_url, title, subreddit, ai_count, total_count, 
+                       created_at, deleted_at, is_deleted
+                FROM posts 
+                WHERE subreddit = ?
+                ORDER BY created_at DESC
+            """, (subreddit,)).fetchall()
+        else:
+            # Public view: only show non-deleted posts
+            rows = conn.execute("""
+                SELECT id, reddit_url, title, subreddit, ai_count, total_count, created_at
+                FROM posts 
+                WHERE subreddit = ? AND is_deleted = 0
+                ORDER BY created_at DESC
+            """, (subreddit,)).fetchall()
+        
+        return [dict(row) for row in rows]
+
 def post_exists(reddit_url: str) -> bool:
     """Check if a Reddit URL has already been processed"""
     with get_db_connection() as conn:
