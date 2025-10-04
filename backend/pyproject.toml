@@ -11,4 +11,5 @@ dependencies = [
     "anthropic>=0.40.0",
     "faker>=30.8.2",
     "python-dotenv>=1.1.1",
+    "libsql>=0.1.0",
 ]

@@ -4,6 +4,7 @@
 	import { fade } from 'svelte/transition';
 	import { userManager } from '$lib/user';
 	import { browser } from '$app/environment';
+	import { API_BASE_URL } from '$lib/config';
 
 	// Glitch character pool - only ASCII characters that are truly monospace
 	const glitchChars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|\\;:,.<>?/~`';
@@ -106,7 +107,7 @@
 		if (!browser || !currentPostId || !anonymousUserId || progressLoaded) return;
 		
 		try {
-			const response = await fetch('/api/users/progress', {
+			const response = await fetch(`${API_BASE_URL}/api/users/progress`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -160,7 +161,7 @@
 		}
 		
 		try {
-			const response = await fetch('/api/users/reset-progress', {
+			const response = await fetch(`${API_BASE_URL}/api/users/reset-progress`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -369,7 +370,7 @@
 		// Save guess to backend (only in browser with valid user ID)
 		if (browser && currentPostId && anonymousUserId) {
 			try {
-				await fetch('/api/users/guess', {
+				await fetch(`${API_BASE_URL}/api/users/guess`, {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json'

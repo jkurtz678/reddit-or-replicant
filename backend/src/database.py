@@ -5,15 +5,55 @@ Database service for storing Reddit posts and generated comments.
 
 import sqlite3
 import json
+import os
 from datetime import datetime
 from typing import List, Dict, Optional
 from contextlib import contextmanager
+try:
+    import libsql
+    LIBSQL_AVAILABLE = True
+except ImportError:
+    LIBSQL_AVAILABLE = False
 
 DB_FILE = "replicant.db"
 
+# Turso configuration
+TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
+TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+
+def use_turso() -> bool:
+    """Check if we should use Turso based on environment variables and context"""
+    # Only use Turso if:
+    # 1. Environment variables are set AND
+    # 2. libsql is available AND
+    # 3. We're in a production environment (no local DB file or explicitly set)
+    if not (TURSO_DATABASE_URL and TURSO_AUTH_TOKEN and LIBSQL_AVAILABLE):
+        return False
+
+    # Check if we're in a production environment
+    # If FLY_APP_NAME is set, we're on Fly.io (production)
+    if os.getenv("FLY_APP_NAME"):
+        return True
+
+    # If local database file doesn't exist, use Turso
+    if not os.path.exists(DB_FILE):
+        return True
+
+    # If FORCE_TURSO is explicitly set, use Turso
+    if os.getenv("FORCE_TURSO", "").lower() in ("true", "1", "yes"):
+        return True
+
+    # Default to local SQLite for development
+    return False
+
 def init_database():
-    """Initialize the SQLite database with required tables"""
-    with sqlite3.connect(DB_FILE) as conn:
+    """Initialize the database with required tables"""
+    if use_turso():
+        conn = libsql.connect(database=TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+    else:
+        conn = sqlite3.connect(DB_FILE)
+
+    try:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS posts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,7 +68,7 @@ def init_database():
                 is_deleted INTEGER DEFAULT 0
             )
         """)
-        
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,7 +76,7 @@ def init_database():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS user_guesses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,18 +93,29 @@ def init_database():
                 UNIQUE(user_id, post_id, comment_id)
             )
         """)
-        
+
         conn.commit()
+    finally:
+        conn.close()
 
 @contextmanager
 def get_db_connection():
     """Context manager for database connections"""
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row  # Enable dict-like access to rows
-    try:
-        yield conn
-    finally:
-        conn.close()
+    if use_turso():
+        # Use Turso connection
+        conn = libsql.connect(database=TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+        try:
+            yield conn
+        finally:
+            conn.close()
+    else:
+        # Use local SQLite
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row  # Enable dict-like access to rows
+        try:
+            yield conn
+        finally:
+            conn.close()
 
 def save_post(reddit_url: str, title: str, subreddit: str, 
               mixed_comments_data: dict, ai_count: int, total_count: int) -> int:

@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { API_BASE_URL } from './config';
 
 // Anonymous user management using localStorage
 export const userManager = {
@@ -39,7 +40,7 @@ export const userManager = {
 		if (!browser) return;
 		
 		try {
-			const response = await fetch('/api/users/register', {
+			const response = await fetch(`${API_BASE_URL}/api/users/register`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'

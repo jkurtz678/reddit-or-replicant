@@ -3,6 +3,7 @@
 Reddit API fetcher for retrieving post and comment data.
 """
 
+import asyncio
 import httpx
 import json
 import re
@@ -61,10 +62,19 @@ async def fetch_reddit_post(url: str) -> Optional[Dict[Any, Any]]:
     
     # Set a user agent to avoid being blocked
     headers = {
-        'User-Agent': 'Replicant Bot 1.0 (for educational purposes)'
+        'User-Agent': 'Mozilla/5.0 (compatible; ReplicantBot/1.0; +https://replicant-frontend.fly.dev)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
     }
     
     try:
+        # Add a small delay to be respectful to Reddit's servers
+        await asyncio.sleep(0.5)
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(json_url, headers=headers)
             response.raise_for_status()

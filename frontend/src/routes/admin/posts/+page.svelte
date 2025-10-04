@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { adminSession } from '$lib/admin';
+	import { API_BASE_URL } from '$lib/config';
 
 	interface PostListItem {
 		id: number;
@@ -47,7 +48,7 @@
 	async function loadPosts() {
 		try {
 			loading = true;
-			const response = await fetch('/api/posts?include_deleted=true');
+			const response = await fetch(API_BASE_URL + '/api/posts?include_deleted=true');
 			if (!response.ok) throw new Error('Failed to fetch posts');
 			const data = await response.json();
 			posts = data.posts || [];
@@ -66,7 +67,7 @@
 			submitting = true;
 			error = '';
 			
-			const response = await fetch('/api/posts/submit', {
+			const response = await fetch(API_BASE_URL + '/api/posts/submit', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -96,7 +97,7 @@
 	}
 
 	function playGame(postId: number) {
-		goto(`/test?post=${postId}`);
+		goto('/test?post=' + postId);
 	}
 
 	async function deletePost(postId: number) {
@@ -105,7 +106,7 @@
 		}
 
 		try {
-			const response = await fetch(`/api/admin/posts/${postId}/delete`, {
+			const response = await fetch(API_BASE_URL + '/api/admin/posts/' + postId + '/delete', {
 				method: 'POST'
 			});
 
@@ -113,7 +114,7 @@
 				await loadPosts(); // Refresh the list
 			} else {
 				const errorData = await response.json();
-				alert(`Failed to delete post: ${errorData.detail}`);
+				alert('Failed to delete post: ' + errorData.detail);
 			}
 		} catch (err) {
 			console.error('Delete failed:', err);
@@ -123,7 +124,7 @@
 
 	async function restorePost(postId: number) {
 		try {
-			const response = await fetch(`/api/admin/posts/${postId}/restore`, {
+			const response = await fetch(API_BASE_URL + '/api/admin/posts/' + postId + '/restore', {
 				method: 'POST'
 			});
 
@@ -131,7 +132,7 @@
 				await loadPosts(); // Refresh the list
 			} else {
 				const errorData = await response.json();
-				alert(`Failed to restore post: ${errorData.detail}`);
+				alert('Failed to restore post: ' + errorData.detail);
 			}
 		} catch (err) {
 			console.error('Restore failed:', err);

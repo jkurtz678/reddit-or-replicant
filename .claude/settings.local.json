@@ -6,7 +6,13 @@
       "Bash(rmdir:*)",
       "Bash(cp:*)",
       "Bash(npm run check:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm run build:*)",
+      "Bash(pnpm run:*)",
+      "WebSearch",
+      "WebFetch(domain:fly.io)",
+      "WebFetch(domain:turso.tech)",
+      "WebFetch(domain:docs.turso.tech)"
     ],
     "deny": []
   }

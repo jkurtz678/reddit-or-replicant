@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
 import os
@@ -24,6 +24,15 @@ from src.gen.generate_mixed_comments import (
 from src.reddit_parser import Comment
 
 app = FastAPI()
+
+# Add CORS middleware for frontend-backend communication
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, you'd want to restrict this to your frontend domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Pydantic models for request/response
 class SubmitURLRequest(BaseModel):
@@ -327,7 +336,9 @@ async def submit_reddit_url(request: SubmitURLRequest):
     
     try:
         # Fetch Reddit data
+        print(f"Attempting to fetch Reddit URL: {request.url}")
         reddit_data = await fetch_reddit_post(request.url)
+        print(f"Successfully fetched Reddit data")
         
         # Extract basic post info for response
         post_info = extract_post_info(reddit_data)
@@ -399,6 +410,7 @@ async def submit_reddit_url(request: SubmitURLRequest):
         }
         
     except ValueError as e:
+        print(f"ValueError in submit endpoint: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process Reddit post: {str(e)}")
@@ -439,20 +451,7 @@ def get_mixed_comments(post_id: int):
     
     return post_data['mixed_comments']
 
-# Proxy all other requests to SvelteKit dev server
-@app.get("/{full_path:path}")
-async def proxy_to_frontend(full_path: str, request: Request):
-    frontend_url = f"http://localhost:5173/{full_path}"
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            frontend_url,
-            headers=dict(request.headers),
-            params=dict(request.query_params)
-        )
-        return StreamingResponse(
-            iter([response.content]),
-            status_code=response.status_code,
-            headers=dict(response.headers),
-            media_type=response.headers.get("content-type")
-        )
+# Simple root endpoint for API status
+@app.get("/")
+async def root():
+    return {"message": "Reddit or Replicant API", "status": "running"}

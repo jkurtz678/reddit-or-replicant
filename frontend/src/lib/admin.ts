@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { API_BASE_URL } from './config';
 
 // Simple admin session management using localStorage
 export const adminSession = {
@@ -9,7 +10,7 @@ export const adminSession = {
 		if (!browser) return false;
 		
 		try {
-			const response = await fetch('/api/admin/login', {
+			const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'

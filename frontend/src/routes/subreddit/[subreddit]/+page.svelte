@@ -5,6 +5,7 @@
 	import { adminSession } from '$lib/admin';
 	import { userManager } from '$lib/user';
 	import { browser } from '$app/environment';
+	import { API_BASE_URL } from '$lib/config';
 
 	interface PostListItem {
 		id: number;
@@ -75,24 +76,17 @@
 	});
 
 	async function loadPosts() {
-		if (!currentSubreddit) {
-			console.log('No currentSubreddit, skipping load');
-			return;
-		}
-		
-		console.log('Loading posts for subreddit:', currentSubreddit);
-		
+		if (!currentSubreddit) return;
+
 		try {
 			loading = true;
-			const response = await fetch(`/api/posts/subreddit/${currentSubreddit}`);
+			const response = await fetch(`${API_BASE_URL}/api/posts/subreddit/${currentSubreddit}`);
 			if (!response.ok) throw new Error('Failed to fetch posts');
 			const data = await response.json();
-			console.log('Received data:', data);
 			posts = data.posts || [];
-			console.log('Set posts to:', posts);
 		} catch (err) {
 			error = 'Failed to load posts';
-			console.error('Error loading posts:', err);
+			console.error(err);
 		} finally {
 			loading = false;
 		}
@@ -102,7 +96,7 @@
 		if (!browser || !anonymousUserId || progressLoaded) return;
 		
 		try {
-			const response = await fetch(`/api/users/${anonymousUserId}/progress`);
+			const response = await fetch(`${API_BASE_URL}/api/users/${anonymousUserId}/progress`);
 			if (!response.ok) {
 				console.error('Failed to load user progress');
 				return;
@@ -136,7 +130,7 @@
 			submitting = true;
 			error = '';
 			
-			const response = await fetch('/api/posts/submit', {
+			const response = await fetch(`${API_BASE_URL}/api/posts/submit`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',

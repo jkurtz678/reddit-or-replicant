@@ -1,2 +1,2 @@
 #!/bin/bash
-uv run uvicorn server:app --reload
+uv run python -m uvicorn server:app --reload  
