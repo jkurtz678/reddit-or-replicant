@@ -3,7 +3,6 @@
 Database service for storing Reddit posts and generated comments.
 """
 
-import sqlite3
 import json
 import os
 from datetime import datetime
@@ -20,6 +19,14 @@ DB_FILE = "replicant.db"
 # Turso configuration
 TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
 TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+
+def convert_rows_to_dicts(rows, columns):
+    """Convert libsql rows (tuples) to dictionaries"""
+    if not rows:
+        return []
+
+    # libsql always returns tuples, so we can simplify this
+    return [dict(zip(columns, row)) for row in rows]
 
 def use_turso() -> bool:
     """Check if we should use Turso based on environment variables and context"""
@@ -51,7 +58,8 @@ def init_database():
     if use_turso():
         conn = libsql.connect(database=TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
     else:
-        conn = sqlite3.connect(DB_FILE)
+        # Use libsql for local file too
+        conn = libsql.connect(f"file:{DB_FILE}")
 
     try:
         conn.execute("""
@@ -99,26 +107,35 @@ def init_database():
         conn.close()
 
 @contextmanager
-def get_db_connection():
+def get_db_connection(force_turso: bool = None):
     """Context manager for database connections"""
-    if use_turso():
-        # Use Turso connection
+    should_use_turso = use_turso()
+
+    # Allow override via parameter
+    if force_turso is not None:
+        should_use_turso = force_turso and bool(TURSO_DATABASE_URL and TURSO_AUTH_TOKEN and LIBSQL_AVAILABLE)
+
+    # Debug logging (comment out for production)
+    # print(f"get_db_connection: force_turso={force_turso}, should_use_turso={should_use_turso}")
+
+    if should_use_turso:
+        # Use Turso remote connection
         conn = libsql.connect(database=TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
         try:
             yield conn
         finally:
             conn.close()
     else:
-        # Use local SQLite
-        conn = sqlite3.connect(DB_FILE)
-        conn.row_factory = sqlite3.Row  # Enable dict-like access to rows
+        # Use libsql for local file too - consistent format
+        print("Using libsql local connection")
+        conn = libsql.connect(f"file:{DB_FILE}")
         try:
             yield conn
         finally:
             conn.close()
 
-def save_post(reddit_url: str, title: str, subreddit: str, 
-              mixed_comments_data: dict, ai_count: int, total_count: int) -> int:
+def save_post(reddit_url: str, title: str, subreddit: str,
+              mixed_comments_data: dict, ai_count: int, total_count: int, force_turso: bool = None) -> int:
     """
     Save a processed Reddit post with mixed comments to the database
     
@@ -127,7 +144,7 @@ def save_post(reddit_url: str, title: str, subreddit: str,
     """
     mixed_comments_json = json.dumps(mixed_comments_data)
     
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         cursor = conn.execute("""
             INSERT INTO posts (reddit_url, title, subreddit, mixed_comments_json, ai_count, total_count)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -135,85 +152,90 @@ def save_post(reddit_url: str, title: str, subreddit: str,
         conn.commit()
         return cursor.lastrowid
 
-def get_post_by_id(post_id: int) -> Optional[Dict]:
+def get_post_by_id(post_id: int, force_turso: bool = None) -> Optional[Dict]:
     """Get a post by ID with parsed JSON comments"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         row = conn.execute("""
-            SELECT id, reddit_url, title, subreddit, mixed_comments_json, 
+            SELECT id, reddit_url, title, subreddit, mixed_comments_json,
                    ai_count, total_count, created_at
-            FROM posts 
+            FROM posts
             WHERE id = ?
         """, (post_id,)).fetchone()
-        
+
         if row:
+            # libsql always returns tuples, so we can handle consistently
             return {
-                'id': row['id'],
-                'reddit_url': row['reddit_url'],
-                'title': row['title'],
-                'subreddit': row['subreddit'],
-                'mixed_comments': json.loads(row['mixed_comments_json']),
-                'ai_count': row['ai_count'],
-                'total_count': row['total_count'],
-                'created_at': row['created_at']
+                'id': row[0],
+                'reddit_url': row[1],
+                'title': row[2],
+                'subreddit': row[3],
+                'mixed_comments': json.loads(row[4]),
+                'ai_count': row[5],
+                'total_count': row[6],
+                'created_at': row[7]
             }
         return None
 
-def get_all_posts(include_deleted: bool = False) -> List[Dict]:
+def get_all_posts(include_deleted: bool = False, force_turso: bool = None) -> List[Dict]:
     """Get all posts (without full comment data for listing)"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         if include_deleted:
             # Admin view: show all posts including deleted ones
             rows = conn.execute("""
-                SELECT id, reddit_url, title, subreddit, ai_count, total_count, 
+                SELECT id, reddit_url, title, subreddit, ai_count, total_count,
                        created_at, deleted_at, is_deleted
-                FROM posts 
+                FROM posts
                 ORDER BY created_at DESC
             """).fetchall()
+            columns = ['id', 'reddit_url', 'title', 'subreddit', 'ai_count', 'total_count', 'created_at', 'deleted_at', 'is_deleted']
         else:
             # Public view: only show non-deleted posts
             rows = conn.execute("""
                 SELECT id, reddit_url, title, subreddit, ai_count, total_count, created_at
-                FROM posts 
+                FROM posts
                 WHERE is_deleted = 0
                 ORDER BY created_at DESC
             """).fetchall()
-        
-        return [dict(row) for row in rows]
+            columns = ['id', 'reddit_url', 'title', 'subreddit', 'ai_count', 'total_count', 'created_at']
 
-def get_posts_by_subreddit(subreddit: str, include_deleted: bool = False) -> List[Dict]:
+        return convert_rows_to_dicts(rows, columns)
+
+def get_posts_by_subreddit(subreddit: str, include_deleted: bool = False, force_turso: bool = None) -> List[Dict]:
     """Get posts filtered by subreddit (without full comment data for listing)"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         if include_deleted:
             # Admin view: show all posts including deleted ones
             rows = conn.execute("""
-                SELECT id, reddit_url, title, subreddit, ai_count, total_count, 
+                SELECT id, reddit_url, title, subreddit, ai_count, total_count,
                        created_at, deleted_at, is_deleted
-                FROM posts 
+                FROM posts
                 WHERE subreddit = ?
                 ORDER BY created_at DESC
             """, (subreddit,)).fetchall()
+            columns = ['id', 'reddit_url', 'title', 'subreddit', 'ai_count', 'total_count', 'created_at', 'deleted_at', 'is_deleted']
         else:
             # Public view: only show non-deleted posts
             rows = conn.execute("""
                 SELECT id, reddit_url, title, subreddit, ai_count, total_count, created_at
-                FROM posts 
+                FROM posts
                 WHERE subreddit = ? AND is_deleted = 0
                 ORDER BY created_at DESC
             """, (subreddit,)).fetchall()
-        
-        return [dict(row) for row in rows]
+            columns = ['id', 'reddit_url', 'title', 'subreddit', 'ai_count', 'total_count', 'created_at']
 
-def post_exists(reddit_url: str) -> bool:
+        return convert_rows_to_dicts(rows, columns)
+
+def post_exists(reddit_url: str, force_turso: bool = None) -> bool:
     """Check if a Reddit URL has already been processed"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         row = conn.execute("""
             SELECT 1 FROM posts WHERE reddit_url = ?
         """, (reddit_url,)).fetchone()
         return row is not None
 
-def soft_delete_post(post_id: int) -> bool:
+def soft_delete_post(post_id: int, force_turso: bool = None) -> bool:
     """Soft delete a post by ID"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         cursor = conn.execute("""
             UPDATE posts 
             SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP 
@@ -222,9 +244,9 @@ def soft_delete_post(post_id: int) -> bool:
         conn.commit()
         return cursor.rowcount > 0
 
-def restore_post(post_id: int) -> bool:
+def restore_post(post_id: int, force_turso: bool = None) -> bool:
     """Restore a soft-deleted post by ID"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         cursor = conn.execute("""
             UPDATE posts 
             SET is_deleted = 0, deleted_at = NULL 
@@ -235,7 +257,7 @@ def restore_post(post_id: int) -> bool:
 
 def delete_post(post_id: int) -> bool:
     """Hard delete a post by ID (kept for backwards compatibility)"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         cursor = conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
         conn.commit()
         return cursor.rowcount > 0

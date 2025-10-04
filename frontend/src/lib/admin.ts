@@ -1,6 +1,49 @@
 import { browser } from '$app/environment';
 import { API_BASE_URL } from './config';
 
+// Admin environment management
+export type AdminEnvironment = 'local' | 'live';
+
+export const adminEnvironment = {
+	/**
+	 * Get current admin environment selection
+	 */
+	get(): AdminEnvironment {
+		if (!browser) return 'local';
+		return (localStorage.getItem('admin_environment') as AdminEnvironment) || 'local';
+	},
+
+	/**
+	 * Set admin environment selection
+	 */
+	set(env: AdminEnvironment): void {
+		if (browser) {
+			localStorage.setItem('admin_environment', env);
+		}
+	},
+
+	/**
+	 * Get API base URL for current environment
+	 * Always use local backend when running locally - only the database target changes
+	 */
+	getApiUrl(): string {
+		// Always use local backend when running locally
+		// The environment toggle only affects which database the backend uses
+		return 'http://localhost:8000';
+	},
+
+	/**
+	 * Get headers for admin API requests
+	 */
+	getHeaders(): Record<string, string> {
+		const env = this.get();
+		return {
+			'Content-Type': 'application/json',
+			'X-Admin-Env': env
+		};
+	}
+};
+
 // Simple admin session management using localStorage
 export const adminSession = {
 	/**
@@ -10,7 +53,7 @@ export const adminSession = {
 		if (!browser) return false;
 		
 		try {
-			const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
+			const response = await fetch(`${adminEnvironment.getApiUrl()}/api/admin/login`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'

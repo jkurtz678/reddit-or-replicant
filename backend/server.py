@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
@@ -73,6 +73,15 @@ class PostResponse(BaseModel):
     created_at: str
 
 # Helper functions
+def parse_admin_environment(x_admin_env: str = None) -> bool:
+    """Parse admin environment header and return force_turso flag"""
+    if x_admin_env == 'live':
+        return True
+    elif x_admin_env == 'local':
+        return False
+    else:
+        return None  # Use default behavior
+
 def comment_to_dict(comment) -> dict:
     """Convert Comment object to dictionary for JSON serialization"""
     return {
@@ -220,29 +229,33 @@ def admin_login(request: AdminLoginRequest):
         raise HTTPException(status_code=401, detail="Invalid admin password")
 
 @app.get("/api/posts")
-def get_posts(include_deleted: bool = False):
+def get_posts(include_deleted: bool = False, x_admin_env: str = Header(None)):
     """Get all saved posts"""
-    posts = get_all_posts(include_deleted=include_deleted)
+    force_turso = parse_admin_environment(x_admin_env)
+    posts = get_all_posts(include_deleted=include_deleted, force_turso=force_turso)
     return {"posts": posts}
 
 @app.get("/api/posts/subreddit/{subreddit}")
-def get_posts_by_subreddit_endpoint(subreddit: str, include_deleted: bool = False):
+def get_posts_by_subreddit_endpoint(subreddit: str, include_deleted: bool = False, x_admin_env: str = Header(None)):
     """Get posts filtered by subreddit"""
-    posts = get_posts_by_subreddit(subreddit, include_deleted=include_deleted)
+    force_turso = parse_admin_environment(x_admin_env)
+    posts = get_posts_by_subreddit(subreddit, include_deleted=include_deleted, force_turso=force_turso)
     return {"posts": posts, "subreddit": subreddit}
 
 @app.post("/api/admin/posts/{post_id}/delete")
-def admin_delete_post(post_id: int):
+def admin_delete_post(post_id: int, x_admin_env: str = Header(None)):
     """Soft delete a post (admin only)"""
-    if soft_delete_post(post_id):
+    force_turso = parse_admin_environment(x_admin_env)
+    if soft_delete_post(post_id, force_turso=force_turso):
         return {"message": "Post deleted successfully", "post_id": post_id}
     else:
         raise HTTPException(status_code=404, detail="Post not found or already deleted")
 
 @app.post("/api/admin/posts/{post_id}/restore")
-def admin_restore_post(post_id: int):
+def admin_restore_post(post_id: int, x_admin_env: str = Header(None)):
     """Restore a soft-deleted post (admin only)"""
-    if restore_post(post_id):
+    force_turso = parse_admin_environment(x_admin_env)
+    if restore_post(post_id, force_turso=force_turso):
         return {"message": "Post restored successfully", "post_id": post_id}
     else:
         raise HTTPException(status_code=404, detail="Post not found or not deleted")
@@ -318,15 +331,18 @@ def reset_progress(request: ResetProgressRequest):
         raise HTTPException(status_code=500, detail=f"Failed to reset progress: {str(e)}")
 
 @app.post("/api/posts/submit")
-async def submit_reddit_url(request: SubmitURLRequest):
+async def submit_reddit_url(request: SubmitURLRequest, x_admin_env: str = Header(None)):
     """Submit a Reddit URL for processing"""
     
     # Validate URL format
     if not validate_reddit_url(request.url):
         raise HTTPException(status_code=400, detail="Invalid Reddit URL format")
     
+    # Parse admin environment
+    force_turso = parse_admin_environment(x_admin_env)
+
     # Check if already processed
-    if post_exists(request.url):
+    if post_exists(request.url, force_turso=force_turso):
         raise HTTPException(status_code=400, detail="This Reddit post has already been processed")
     
     # Check for API key
@@ -396,7 +412,8 @@ async def submit_reddit_url(request: SubmitURLRequest):
             subreddit=post.subreddit,
             mixed_comments_data=final_data,
             ai_count=total_ai_final,
-            total_count=total_final_comments
+            total_count=total_final_comments,
+            force_turso=force_turso
         )
         
         return {
@@ -416,12 +433,13 @@ async def submit_reddit_url(request: SubmitURLRequest):
         raise HTTPException(status_code=500, detail=f"Failed to process Reddit post: {str(e)}")
 
 @app.get("/api/posts/{post_id}")
-def get_post(post_id: int):
+def get_post(post_id: int, x_admin_env: str = Header(None)):
     """Get a specific post with mixed comments"""
-    post_data = get_post_by_id(post_id)
+    force_turso = parse_admin_environment(x_admin_env)
+    post_data = get_post_by_id(post_id, force_turso=force_turso)
     if not post_data:
         raise HTTPException(status_code=404, detail="Post not found")
-    
+
     return post_data['mixed_comments']
 
 @app.get("/api/test-reddit")
@@ -443,12 +461,13 @@ def get_test_reddit_raw():
     return data
 
 @app.get("/api/mixed-comments/{post_id}")
-def get_mixed_comments(post_id: int):
+def get_mixed_comments(post_id: int, x_admin_env: str = Header(None)):
     """Get the mixed real + AI comments for a specific post"""
-    post_data = get_post_by_id(post_id)
+    force_turso = parse_admin_environment(x_admin_env)
+    post_data = get_post_by_id(post_id, force_turso=force_turso)
     if not post_data:
         raise HTTPException(status_code=404, detail="Post not found")
-    
+
     return post_data['mixed_comments']
 
 # Simple root endpoint for API status

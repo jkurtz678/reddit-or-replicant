@@ -3,7 +3,7 @@ import { browser } from '$app/environment';
 // API configuration for different environments
 export const API_BASE_URL = browser
   ? (import.meta.env.PROD
-      ? 'https://redditorreplicant.fly.dev'
+      ? 'https://replicant-backend.fly.dev'
       : 'http://localhost:8000')
   : 'http://localhost:8000'; // SSR fallback
 

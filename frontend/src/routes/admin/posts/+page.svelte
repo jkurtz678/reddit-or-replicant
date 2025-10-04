@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { adminSession } from '$lib/admin';
+	import { adminSession, adminEnvironment, type AdminEnvironment } from '$lib/admin';
 	import { API_BASE_URL } from '$lib/config';
 
 	interface PostListItem {
@@ -23,6 +23,7 @@
 	let redditUrl = '';
 	let showSubmitDialog = false;
 	let dialogVisible = false;
+	let currentEnvironment: AdminEnvironment = 'local';
 
 	// Check admin auth on mount
 	onMount(async () => {
@@ -30,8 +31,16 @@
 			goto('/admin');
 			return;
 		}
+		currentEnvironment = adminEnvironment.get();
 		await loadPosts();
 	});
+
+	// Handle environment switching
+	async function switchEnvironment(env: AdminEnvironment) {
+		currentEnvironment = env;
+		adminEnvironment.set(env);
+		await loadPosts(); // Reload posts from new environment
+	}
 
 	// Handle dialog opening with transition
 	function openDialog() {
@@ -48,7 +57,9 @@
 	async function loadPosts() {
 		try {
 			loading = true;
-			const response = await fetch(API_BASE_URL + '/api/posts?include_deleted=true');
+			const response = await fetch(adminEnvironment.getApiUrl() + '/api/posts?include_deleted=true', {
+				headers: adminEnvironment.getHeaders()
+			});
 			if (!response.ok) throw new Error('Failed to fetch posts');
 			const data = await response.json();
 			posts = data.posts || [];
@@ -67,11 +78,9 @@
 			submitting = true;
 			error = '';
 			
-			const response = await fetch(API_BASE_URL + '/api/posts/submit', {
+			const response = await fetch(adminEnvironment.getApiUrl() + '/api/posts/submit', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
+				headers: adminEnvironment.getHeaders(),
 				body: JSON.stringify({ url: redditUrl.trim() }),
 			});
 			
@@ -106,8 +115,9 @@
 		}
 
 		try {
-			const response = await fetch(API_BASE_URL + '/api/admin/posts/' + postId + '/delete', {
-				method: 'POST'
+			const response = await fetch(adminEnvironment.getApiUrl() + '/api/admin/posts/' + postId + '/delete', {
+				method: 'POST',
+				headers: adminEnvironment.getHeaders()
 			});
 
 			if (response.ok) {
@@ -124,8 +134,9 @@
 
 	async function restorePost(postId: number) {
 		try {
-			const response = await fetch(API_BASE_URL + '/api/admin/posts/' + postId + '/restore', {
-				method: 'POST'
+			const response = await fetch(adminEnvironment.getApiUrl() + '/api/admin/posts/' + postId + '/restore', {
+				method: 'POST',
+				headers: adminEnvironment.getHeaders()
 			});
 
 			if (response.ok) {
@@ -156,7 +167,18 @@
 				</a>
 				<div class="flex items-center gap-4">
 					<span class="text-sm text-amber-400">Admin Mode</span>
-					<button 
+					<div class="flex items-center gap-2">
+						<span class="text-sm text-gray-400">Environment:</span>
+						<select
+							bind:value={currentEnvironment}
+							on:change={() => switchEnvironment(currentEnvironment)}
+							class="px-2 py-1 text-sm rounded bg-gray-800 border border-gray-600 text-white focus:border-blue-400 focus:outline-none cursor-pointer"
+						>
+							<option value="local">Local</option>
+							<option value="live">Live</option>
+						</select>
+					</div>
+					<button
 						on:click={logout}
 						class="px-3 py-1 text-white rounded text-sm transition-all duration-200 cursor-pointer hover:scale-105"
 						style="background: linear-gradient(135deg, #374151, #6b7280); border: 1px solid rgba(156, 163, 175, 0.3);"
