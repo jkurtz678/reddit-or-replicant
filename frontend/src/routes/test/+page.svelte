@@ -57,18 +57,18 @@
 		anonymousUserId = userManager.getUserId();
 	}
 	
-	// Load user progress when both post and user are available
+	// Load all data when both post ID and user are available
 	$: if (browser && anonymousUserId && currentPostId && !progressLoaded) {
-		loadUserProgress();
+		loadAllData();
 	}
 	
-	// Load post data only if post ID is provided in URL
+	// Initialize post ID from URL params
 	onMount(async () => {
 		const postId = $page.url.searchParams.get('post');
-		
+
 		if (postId) {
 			currentPostId = parseInt(postId);
-			await loadPost(currentPostId);
+			// The reactive statement will handle loading when anonymousUserId is available
 		} else {
 			loading = false;
 			error = 'No post specified. Visit /subreddit to choose a community.';
@@ -77,12 +77,9 @@
 
 	async function loadPost(postId: number) {
 		try {
-			loading = true;
-			error = '';
-			
 			const response = await fetch(`${databaseManager.getApiUrl()}/api/mixed-comments/${postId}`, {
-			headers: databaseManager.getHeaders()
-		});
+				headers: databaseManager.getHeaders()
+			});
 			if (!response.ok) {
 				if (response.status === 404) {
 					throw new Error('Post not found');
@@ -90,24 +87,17 @@
 				throw new Error('Failed to fetch post data');
 			}
 			const data = await response.json();
-			
-			redditData = data;
-			currentSubreddit = data.post?.subreddit || '';
-			
-			// Reset guessing state (will be restored from backend if exists)
-			guessedComments = new Map();
-			
+			return data;
+
 		} catch (err: any) {
-			error = err.message;
-			console.error(err);
-		} finally {
-			loading = false;
+			console.error('Error loading post:', err);
+			throw err;
 		}
 	}
 
 	async function loadUserProgress() {
-		if (!browser || !currentPostId || !anonymousUserId || progressLoaded) return;
-		
+		if (!browser || !currentPostId || !anonymousUserId) return null;
+
 		try {
 			const response = await fetch(`${databaseManager.getApiUrl()}/api/users/progress`, {
 				method: 'POST',
@@ -117,39 +107,71 @@
 					post_id: currentPostId
 				})
 			});
-			
+
 			if (!response.ok) {
-				console.error('Failed to load user progress');
-				return;
+				throw new Error('Failed to load user progress');
 			}
-			
+
 			const progress = await response.json();
-			progressLoaded = true;
-			
-			// Restore guessing state from backend
-			if (progress.guesses && progress.guesses.length > 0) {
-				for (const guess of progress.guesses) {
+			return progress;
+
+		} catch (err) {
+			console.error('Error loading user progress:', err);
+			throw err;
+		}
+	}
+
+	async function loadAllData() {
+		if (!browser || !currentPostId || !anonymousUserId) return;
+
+		try {
+			loading = true;
+			error = '';
+
+			// Run both API calls in parallel
+			const [postData, progressData] = await Promise.all([
+				loadPost(currentPostId),
+				loadUserProgress()
+			]);
+
+			// Update state only after both complete successfully
+			redditData = postData;
+			currentSubreddit = postData.post?.subreddit || '';
+
+			// Reset guessing state (will be restored from backend if exists)
+			guessedComments = new Map();
+
+			// Restore guessing state from backend if progress exists
+			if (progressData && progressData.guesses && progressData.guesses.length > 0) {
+				for (const guess of progressData.guesses) {
 					guessedComments.set(guess.comment_id, {
 						guessed: true,
 						correct: guess.is_correct,
 						userGuess: guess.guess as 'reddit' | 'replicant'
 					});
-					
+
 					// Restart text glitching for AI comments that were already guessed
-					if (redditData) {
-						const comment = getAllCommentsFlat(redditData.comments).find(c => c.id === guess.comment_id);
-						if (comment && comment.is_ai) {
-							setTimeout(() => startTextGlitch(guess.comment_id, comment.content), 100);
-						}
+					const comment = getAllCommentsFlat(postData.comments).find(c => c.id === guess.comment_id);
+					if (comment && comment.is_ai) {
+						setTimeout(() => startTextGlitch(guess.comment_id, comment.content), 100);
 					}
 				}
-				
+
 				// Trigger reactivity
 				guessedComments = guessedComments;
 			}
-			
-		} catch (err) {
-			console.error('Error loading user progress:', err);
+
+			progressLoaded = true;
+
+		} catch (err: any) {
+			error = err.message || 'Failed to load data';
+			console.error('Error loading data:', err);
+			// Reset state on error
+			redditData = null;
+			guessedComments = new Map();
+			progressLoaded = false;
+		} finally {
+			loading = false;
 		}
 	}
 
@@ -352,39 +374,20 @@
 
 	async function makeGuess(commentId: string, guess: 'reddit' | 'replicant', actualIsAi: boolean) {
 		const correct = (guess === 'replicant' && actualIsAi) || (guess === 'reddit' && !actualIsAi);
-		
+
 		guessedComments.set(commentId, {
 			guessed: true,
 			correct: correct,
 			userGuess: guess
 		});
-		
+
 		// Mark that a guess was just made
 		justMadeGuess = true;
-		
+
 		// Trigger reactivity
 		guessedComments = guessedComments;
-		
-		// Save guess to backend (only in browser with valid user ID)
-		if (browser && currentPostId && anonymousUserId) {
-			try {
-				await fetch(`${databaseManager.getApiUrl()}/api/users/guess`, {
-					method: 'POST',
-					headers: databaseManager.getHeaders(),
-					body: JSON.stringify({
-						anonymous_id: anonymousUserId,
-						post_id: currentPostId,
-						comment_id: commentId,
-						guess: guess,
-						is_correct: correct
-					})
-				});
-			} catch (err) {
-				console.error('Failed to save guess:', err);
-			}
-		}
-		
-		// Start text glitching for AI comments
+
+		// Start text glitching for AI comments IMMEDIATELY
 		if (actualIsAi) {
 			// Get the comment text
 			const comment = getAllCommentsFlat(redditData?.comments || []).find(c => c.id === commentId);
@@ -392,6 +395,23 @@
 				// Start font transition immediately with the reveal
 				startTextGlitch(commentId, comment.content);
 			}
+		}
+
+		// Save guess to backend in background (don't await - fire and forget)
+		if (browser && currentPostId && anonymousUserId) {
+			fetch(`${databaseManager.getApiUrl()}/api/users/guess`, {
+				method: 'POST',
+				headers: databaseManager.getHeaders(),
+				body: JSON.stringify({
+					anonymous_id: anonymousUserId,
+					post_id: currentPostId,
+					comment_id: commentId,
+					guess: guess,
+					is_correct: correct
+				})
+			}).catch(err => {
+				console.error('Failed to save guess:', err);
+			});
 		}
 	}
 

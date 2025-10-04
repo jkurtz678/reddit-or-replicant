@@ -40,11 +40,6 @@
 	// Get subreddit from URL params
 	$: currentSubreddit = $page.params.subreddit || '';
 
-	// Load posts when subreddit changes
-	$: if (currentSubreddit) {
-		loadPosts();
-	}
-
 	// Check if we're in local environment (admin features available)
 	$: showAdminFeatures = isLocalEnvironment();
 
@@ -52,10 +47,10 @@
 	$: if (browser && !anonymousUserId) {
 		anonymousUserId = userManager.getUserId();
 	}
-	
-	// Load user progress when user ID is available and not already loaded
-	$: if (browser && anonymousUserId && !progressLoaded) {
-		loadUserProgress();
+
+	// Load everything when subreddit changes or user ID becomes available
+	$: if (currentSubreddit && browser && anonymousUserId) {
+		loadAllData();
 	}
 
 	// Handle dialog opening with transition
@@ -70,18 +65,20 @@
 		setTimeout(() => showSubmitDialog = false, 300); // Wait for fade out
 	}
 
-	// Load posts on mount
+	// Load data on mount
 	onMount(async () => {
 		// Wait a tick for reactive statements to run
 		await new Promise(resolve => setTimeout(resolve, 0));
-		await loadPosts();
+		// Only load if we have the subreddit - the reactive statement will handle the rest
+		if (currentSubreddit && browser && anonymousUserId) {
+			await loadAllData();
+		}
 	});
 
 	async function loadPosts() {
-		if (!currentSubreddit) return;
+		if (!currentSubreddit) return [];
 
 		try {
-			loading = true;
 			// Include deleted posts for admin users in local environment
 			const includeDeleted = showAdminFeatures ? '?include_deleted=true' : '';
 			const response = await fetch(`${databaseManager.getApiUrl()}/api/posts/subreddit/${currentSubreddit}${includeDeleted}`, {
@@ -89,36 +86,63 @@
 			});
 			if (!response.ok) throw new Error('Failed to fetch posts');
 			const data = await response.json();
-			posts = data.posts || [];
+			return data.posts || [];
 		} catch (err) {
-			error = 'Failed to load posts';
-			console.error(err);
-		} finally {
-			loading = false;
+			console.error('Error loading posts:', err);
+			throw err;
 		}
 	}
 
 	async function loadUserProgress() {
-		if (!browser || !anonymousUserId || progressLoaded) return;
+		if (!browser || !anonymousUserId) return {};
 
 		try {
 			const response = await fetch(`${databaseManager.getApiUrl()}/api/users/${anonymousUserId}/progress`, {
 				headers: databaseManager.getHeaders()
 			});
 			if (!response.ok) {
-				console.error('Failed to load user progress');
-				return;
+				throw new Error('Failed to load user progress');
 			}
 
 			const data = await response.json();
-			userProgress = data.progress || {};
-			progressLoaded = true;
+			return data.progress || {};
 
 		} catch (err) {
 			console.error('Error loading user progress:', err);
+			throw err;
 		}
 	}
-	
+
+	async function loadAllData() {
+		if (!currentSubreddit || !browser || !anonymousUserId) return;
+
+		try {
+			loading = true;
+			error = '';
+
+			// Run both API calls in parallel
+			const [postsData, progressData] = await Promise.all([
+				loadPosts(),
+				loadUserProgress()
+			]);
+
+			// Update state only after both complete successfully
+			posts = postsData;
+			userProgress = progressData;
+			progressLoaded = true;
+
+		} catch (err: any) {
+			error = err.message || 'Failed to load data';
+			console.error('Error loading data:', err);
+			// Reset state on error
+			posts = [];
+			userProgress = {};
+			progressLoaded = false;
+		} finally {
+			loading = false;
+		}
+	}
+
 	// Function to get progress status for a post
 	function getProgressStatus(postId: number, totalComments: number): 'not-started' | 'in-progress' | 'completed' {
 		const progress = userProgress[postId];
@@ -152,15 +176,10 @@
 			const result = await response.json();
 			console.log('Submitted successfully:', result);
 
-			// Clear the input, close dialog, and reload posts
+			// Clear the input, close dialog, and reload data
 			redditUrl = '';
 			closeDialog();
-			await loadPosts();
-
-			// Reload progress if we have a user ID
-			if (browser && anonymousUserId) {
-				progressLoaded = false; // This will trigger reactive reload
-			}
+			await loadAllData();
 
 			// Navigate to the test page with the new post
 			if (result.id) {
@@ -191,7 +210,7 @@
 			});
 
 			if (response.ok) {
-				await loadPosts(); // Refresh the list
+				await loadAllData(); // Refresh the list
 			} else {
 				const errorData = await response.json();
 				alert('Failed to delete post: ' + errorData.detail);
@@ -210,7 +229,7 @@
 			});
 
 			if (response.ok) {
-				await loadPosts(); // Refresh the list
+				await loadAllData(); // Refresh the list
 			} else {
 				const errorData = await response.json();
 				alert('Failed to restore post: ' + errorData.detail);
@@ -253,7 +272,7 @@
 					<a href="/about" class="transition-colors text-sm" style="color: #00d4ff;" >
 						About
 					</a>
-					<DatabaseSelector on:change={loadPosts} />
+					<DatabaseSelector on:change={loadAllData} />
 				</div>
 			</div>
 		</div>
@@ -330,46 +349,48 @@
 										</div>
 									{/if}
 								</div>
-								<div class="ml-4 flex {showAdminFeatures ? 'gap-2' : 'flex-col'} items-end">
-									{#if !post.is_deleted}
-										<button
-											class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer {showAdminFeatures ? '' : 'mb-2'}"
-											style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
-											on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
-											on:mouseleave={(e) => e.target.style.boxShadow = ''}
-											on:click|stopPropagation={() => playGame(post.id)}
-										>
-											{#if progressStatus === 'completed'}
-												Review ({Math.round(userPostProgress.accuracy * 100)}% accuracy)
-											{:else if progressStatus === 'in-progress'}
-												Continue
-											{:else}
-												Begin Test
-											{/if}
-										</button>
-										{#if showAdminFeatures}
+								<div class="ml-4 flex flex-col items-end">
+									<div class="flex {showAdminFeatures ? 'gap-2' : 'flex-col'} items-end {showAdminFeatures ? 'mb-1' : 'mb-2'}">
+										{#if !post.is_deleted}
 											<button
-												on:click|stopPropagation={() => deletePost(post.id)}
 												class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
-												style="background: linear-gradient(135deg, #7f1d1d, #dc2626); border: 1px solid rgba(220, 38, 38, 0.3);"
-												on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(220, 38, 38, 0.4)'}
+												style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+												on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
+												on:mouseleave={(e) => e.target.style.boxShadow = ''}
+												on:click|stopPropagation={() => playGame(post.id)}
+											>
+												{#if progressStatus === 'completed'}
+													Review ({Math.round(userPostProgress.accuracy * 100)}% accuracy)
+												{:else if progressStatus === 'in-progress'}
+													Continue
+												{:else}
+													Begin Test
+												{/if}
+											</button>
+											{#if showAdminFeatures}
+												<button
+													on:click|stopPropagation={() => deletePost(post.id)}
+													class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
+													style="background: linear-gradient(135deg, #7f1d1d, #dc2626); border: 1px solid rgba(220, 38, 38, 0.3);"
+													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(220, 38, 38, 0.4)'}
+													on:mouseleave={(e) => e.target.style.boxShadow = ''}
+												>
+													Delete
+												</button>
+											{/if}
+										{:else if showAdminFeatures}
+											<button
+												on:click|stopPropagation={() => restorePost(post.id)}
+												class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
+												style="background: linear-gradient(135deg, #166534, #16a34a); border: 1px solid rgba(34, 197, 94, 0.3);"
+												on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(34, 197, 94, 0.4)'}
 												on:mouseleave={(e) => e.target.style.boxShadow = ''}
 											>
-												Delete
+												Restore
 											</button>
 										{/if}
-									{:else if showAdminFeatures}
-										<button
-											on:click|stopPropagation={() => restorePost(post.id)}
-											class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
-											style="background: linear-gradient(135deg, #166534, #16a34a); border: 1px solid rgba(34, 197, 94, 0.3);"
-											on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(34, 197, 94, 0.4)'}
-											on:mouseleave={(e) => e.target.style.boxShadow = ''}
-										>
-											Restore
-										</button>
-									{/if}
-									{#if !showAdminFeatures && userPostProgress && userPostProgress.total_guesses > 0}
+									</div>
+									{#if userPostProgress && userPostProgress.total_guesses > 0}
 										<div class="text-xs text-gray-400">
 											{userPostProgress.total_guesses} guessed ({userPostProgress.correct_guesses} correct)
 										</div>
