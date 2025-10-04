@@ -2,10 +2,10 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { adminSession } from '$lib/admin';
 	import { userManager } from '$lib/user';
 	import { browser } from '$app/environment';
-	import { API_BASE_URL } from '$lib/config';
+	import { databaseManager, isLocalEnvironment } from '$lib/environment';
+	import DatabaseSelector from '$lib/components/DatabaseSelector.svelte';
 
 	interface PostListItem {
 		id: number;
@@ -15,6 +15,8 @@
 		ai_count: number;
 		total_count: number;
 		created_at: string;
+		deleted_at?: string;
+		is_deleted?: number;
 	}
 	
 	interface UserProgress {
@@ -43,8 +45,8 @@
 		loadPosts();
 	}
 
-	// Check if user is admin
-	$: isAdmin = adminSession.isAdmin();
+	// Check if we're in local environment (admin features available)
+	$: showAdminFeatures = isLocalEnvironment();
 
 	// Initialize user ID when in browser
 	$: if (browser && !anonymousUserId) {
@@ -80,7 +82,11 @@
 
 		try {
 			loading = true;
-			const response = await fetch(`${API_BASE_URL}/api/posts/subreddit/${currentSubreddit}`);
+			// Include deleted posts for admin users in local environment
+			const includeDeleted = showAdminFeatures ? '?include_deleted=true' : '';
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/posts/subreddit/${currentSubreddit}${includeDeleted}`, {
+				headers: databaseManager.getHeaders()
+			});
 			if (!response.ok) throw new Error('Failed to fetch posts');
 			const data = await response.json();
 			posts = data.posts || [];
@@ -94,18 +100,20 @@
 
 	async function loadUserProgress() {
 		if (!browser || !anonymousUserId || progressLoaded) return;
-		
+
 		try {
-			const response = await fetch(`${API_BASE_URL}/api/users/${anonymousUserId}/progress`);
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/users/${anonymousUserId}/progress`, {
+				headers: databaseManager.getHeaders()
+			});
 			if (!response.ok) {
 				console.error('Failed to load user progress');
 				return;
 			}
-			
+
 			const data = await response.json();
 			userProgress = data.progress || {};
 			progressLoaded = true;
-			
+
 		} catch (err) {
 			console.error('Error loading user progress:', err);
 		}
@@ -125,42 +133,40 @@
 
 	async function submitRedditUrl() {
 		if (!redditUrl.trim()) return;
-		
+
 		try {
 			submitting = true;
 			error = '';
-			
-			const response = await fetch(`${API_BASE_URL}/api/posts/submit`, {
+
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/posts/submit`, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
+				headers: databaseManager.getHeaders(),
 				body: JSON.stringify({ url: redditUrl.trim() }),
 			});
-			
+
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData.detail || 'Failed to submit URL');
 			}
-			
+
 			const result = await response.json();
 			console.log('Submitted successfully:', result);
-			
+
 			// Clear the input, close dialog, and reload posts
 			redditUrl = '';
 			closeDialog();
 			await loadPosts();
-			
+
 			// Reload progress if we have a user ID
 			if (browser && anonymousUserId) {
 				progressLoaded = false; // This will trigger reactive reload
 			}
-			
+
 			// Navigate to the test page with the new post
 			if (result.id) {
 				goto(`/test?post=${result.id}`);
 			}
-			
+
 		} catch (err: any) {
 			error = err.message;
 			console.error(err);
@@ -171,6 +177,48 @@
 
 	function playGame(postId: number) {
 		goto(`/test?post=${postId}`);
+	}
+
+	async function deletePost(postId: number) {
+		if (!confirm('Are you sure you want to delete this post? It can be restored later.')) {
+			return;
+		}
+
+		try {
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/admin/posts/${postId}/delete`, {
+				method: 'POST',
+				headers: databaseManager.getHeaders()
+			});
+
+			if (response.ok) {
+				await loadPosts(); // Refresh the list
+			} else {
+				const errorData = await response.json();
+				alert('Failed to delete post: ' + errorData.detail);
+			}
+		} catch (err) {
+			console.error('Delete failed:', err);
+			alert('Failed to delete post. Please try again.');
+		}
+	}
+
+	async function restorePost(postId: number) {
+		try {
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/admin/posts/${postId}/restore`, {
+				method: 'POST',
+				headers: databaseManager.getHeaders()
+			});
+
+			if (response.ok) {
+				await loadPosts(); // Refresh the list
+			} else {
+				const errorData = await response.json();
+				alert('Failed to restore post: ' + errorData.detail);
+			}
+		} catch (err) {
+			console.error('Restore failed:', err);
+			alert('Failed to restore post. Please try again.');
+		}
 	}
 
 	// Get display name for subreddit
@@ -205,14 +253,7 @@
 					<a href="/about" class="transition-colors text-sm" style="color: #00d4ff;" >
 						About
 					</a>
-					{#if isAdmin}
-						<div class="flex items-center gap-2">
-							<span class="text-sm text-amber-400">Admin</span>
-							<a href="/admin/posts" class="text-sm transition-colors hover:text-blue-300" style="color: #00d4ff;">
-								Manage
-							</a>
-						</div>
-					{/if}
+					<DatabaseSelector on:change={loadPosts} />
 				</div>
 			</div>
 		</div>
@@ -233,8 +274,8 @@
 					<h2 class="text-xl font-semibold text-white">
 						Replicants hiding in {getSubredditDisplayName(currentSubreddit)}
 					</h2>
-					{#if isAdmin}
-						<button 
+					{#if showAdminFeatures}
+						<button
 							on:click={openDialog}
 							class="px-4 py-2 text-white rounded transition-all duration-200 cursor-pointer hover:scale-105"
 							style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
@@ -249,38 +290,86 @@
 					{#each posts as post}
 						{@const progressStatus = getProgressStatus(post.id, post.total_count)}
 						{@const userPostProgress = userProgress[post.id]}
-						<div 
-							class="border border-gray-700 rounded-lg p-6 cursor-pointer transition-all duration-200 hover:border-blue-400 hover:scale-[1.02]"
+						<div
+							class="border border-gray-700 rounded-lg p-6 transition-all duration-200"
+							class:opacity-50={post.is_deleted}
+							class:hover:border-blue-400={!post.is_deleted}
+							class:hover:border-amber-400={post.is_deleted}
+							class:cursor-pointer={!post.is_deleted}
+							class:hover:scale-[1.02]={!post.is_deleted}
 							style="background: rgba(17, 17, 20, 0.85); backdrop-filter: blur(10px);"
-							on:click={() => playGame(post.id)}
-							on:keydown={(e) => e.key === 'Enter' && playGame(post.id)}
-							role="button"
-							tabindex="0"
+							on:click={() => !post.is_deleted && playGame(post.id)}
+							on:keydown={(e) => e.key === 'Enter' && !post.is_deleted && playGame(post.id)}
+							role={!post.is_deleted ? "button" : ""}
+							tabindex={!post.is_deleted ? 0 : -1}
 						>
 							<div class="flex justify-between items-start">
 								<div class="flex-1">
-									<h3 class="font-medium text-white mb-2 text-lg">{post.title}</h3>
-									<div class="text-sm text-gray-400">
+									<div class="flex items-center gap-2 mb-2">
+										<h3 class="font-medium text-white text-lg">{post.title}</h3>
+										{#if post.is_deleted}
+											<span class="px-2 py-1 text-xs rounded text-amber-200 bg-amber-900/30 border border-amber-700/50">
+												Deleted
+											</span>
+										{/if}
+									</div>
+									<div class="text-sm text-gray-400 mb-2">
 										<span style="color: #00d4ff;">r/{post.subreddit}</span>
 										• {post.total_count} comments
-									</div>
-								</div>
-								<div class="ml-4 flex flex-col items-end">
-									<button 
-										class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer mb-2"
-										style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
-										on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
-										on:mouseleave={(e) => e.target.style.boxShadow = ''}
-									>
-										{#if progressStatus === 'completed'}
-											Review ({Math.round(userPostProgress.accuracy * 100)}% accuracy)
-										{:else if progressStatus === 'in-progress'}
-											Continue
-										{:else}
-											Begin Test
+										{#if showAdminFeatures}
+											({post.ai_count} AI, {post.total_count - post.ai_count} real)
+											• {Math.round((post.ai_count / post.total_count) * 100)}% AI
 										{/if}
-									</button>
-									{#if userPostProgress && userPostProgress.total_guesses > 0}
+									</div>
+									{#if showAdminFeatures}
+										<div class="text-xs text-gray-500">
+											Added {new Date(post.created_at).toLocaleDateString()}
+											{#if post.is_deleted && post.deleted_at}
+												• Deleted {new Date(post.deleted_at).toLocaleDateString()}
+											{/if}
+										</div>
+									{/if}
+								</div>
+								<div class="ml-4 flex {showAdminFeatures ? 'gap-2' : 'flex-col'} items-end">
+									{#if !post.is_deleted}
+										<button
+											class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer {showAdminFeatures ? '' : 'mb-2'}"
+											style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+											on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
+											on:mouseleave={(e) => e.target.style.boxShadow = ''}
+											on:click|stopPropagation={() => playGame(post.id)}
+										>
+											{#if progressStatus === 'completed'}
+												Review ({Math.round(userPostProgress.accuracy * 100)}% accuracy)
+											{:else if progressStatus === 'in-progress'}
+												Continue
+											{:else}
+												Begin Test
+											{/if}
+										</button>
+										{#if showAdminFeatures}
+											<button
+												on:click|stopPropagation={() => deletePost(post.id)}
+												class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
+												style="background: linear-gradient(135deg, #7f1d1d, #dc2626); border: 1px solid rgba(220, 38, 38, 0.3);"
+												on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(220, 38, 38, 0.4)'}
+												on:mouseleave={(e) => e.target.style.boxShadow = ''}
+											>
+												Delete
+											</button>
+										{/if}
+									{:else if showAdminFeatures}
+										<button
+											on:click|stopPropagation={() => restorePost(post.id)}
+											class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
+											style="background: linear-gradient(135deg, #166534, #16a34a); border: 1px solid rgba(34, 197, 94, 0.3);"
+											on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(34, 197, 94, 0.4)'}
+											on:mouseleave={(e) => e.target.style.boxShadow = ''}
+										>
+											Restore
+										</button>
+									{/if}
+									{#if !showAdminFeatures && userPostProgress && userPostProgress.total_guesses > 0}
 										<div class="text-xs text-gray-400">
 											{userPostProgress.total_guesses} guessed ({userPostProgress.correct_guesses} correct)
 										</div>
@@ -315,7 +404,7 @@
 </div>
 
 <!-- Submit Dialog (Admin only) -->
-{#if showSubmitDialog && isAdmin}
+{#if showSubmitDialog && showAdminFeatures}
 	<div 
 		class="fixed inset-0 flex items-center justify-center z-50 transition-opacity duration-300"
 		class:opacity-0={!dialogVisible}

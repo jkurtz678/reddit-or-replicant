@@ -264,9 +264,9 @@ def delete_post(post_id: int) -> bool:
 
 # User management functions
 
-def create_user(anonymous_id: str) -> int:
+def create_user(anonymous_id: str, force_turso: bool = None) -> int:
     """Create a new anonymous user"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         cursor = conn.execute("""
             INSERT INTO users (anonymous_id)
             VALUES (?)
@@ -274,61 +274,61 @@ def create_user(anonymous_id: str) -> int:
         conn.commit()
         return cursor.lastrowid
 
-def get_user_by_anonymous_id(anonymous_id: str) -> Optional[Dict]:
+def get_user_by_anonymous_id(anonymous_id: str, force_turso: bool = None) -> Optional[Dict]:
     """Get user by anonymous ID"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         row = conn.execute("""
             SELECT id, anonymous_id, created_at
-            FROM users 
+            FROM users
             WHERE anonymous_id = ?
         """, (anonymous_id,)).fetchone()
-        
+
         if row:
             return {
-                'id': row['id'],
-                'anonymous_id': row['anonymous_id'],
-                'created_at': row['created_at']
+                'id': row[0],
+                'anonymous_id': row[1],
+                'created_at': row[2]
             }
         return None
 
-def get_or_create_user(anonymous_id: str) -> int:
+def get_or_create_user(anonymous_id: str, force_turso: bool = None) -> int:
     """Get existing user ID or create new user, return user ID"""
-    user = get_user_by_anonymous_id(anonymous_id)
+    user = get_user_by_anonymous_id(anonymous_id, force_turso)
     if user:
         return user['id']
     else:
-        return create_user(anonymous_id)
+        return create_user(anonymous_id, force_turso)
 
 # User guess tracking functions
 
-def save_user_guess(user_id: int, post_id: int, comment_id: str, guess: str, is_correct: bool) -> bool:
+def save_user_guess(user_id: int, post_id: int, comment_id: str, guess: str, is_correct: bool, force_turso: bool = None) -> bool:
     """Save or update a user's guess for a specific comment"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         cursor = conn.execute("""
-            INSERT OR REPLACE INTO user_guesses 
+            INSERT OR REPLACE INTO user_guesses
             (user_id, post_id, comment_id, guess, is_correct, guessed_at)
             VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """, (user_id, post_id, comment_id, guess, int(is_correct)))
         conn.commit()
         return cursor.rowcount > 0
 
-def get_user_progress(user_id: int, post_id: int) -> Dict:
+def get_user_progress(user_id: int, post_id: int, force_turso: bool = None) -> Dict:
     """Get user's progress on a specific post"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         # Get all non-deleted guesses for this user/post
         guesses = conn.execute("""
             SELECT comment_id, guess, is_correct, guessed_at
-            FROM user_guesses 
+            FROM user_guesses
             WHERE user_id = ? AND post_id = ? AND is_deleted = 0
             ORDER BY guessed_at
         """, (user_id, post_id)).fetchall()
-        
-        guess_data = [dict(row) for row in guesses]
-        
+
+        guess_data = [dict(zip(['comment_id', 'guess', 'is_correct', 'guessed_at'], row)) for row in guesses]
+
         # Calculate stats
         total_guesses = len(guess_data)
         correct_guesses = sum(1 for g in guess_data if g['is_correct'])
-        
+
         return {
             'total_guesses': total_guesses,
             'correct_guesses': correct_guesses,
@@ -336,39 +336,39 @@ def get_user_progress(user_id: int, post_id: int) -> Dict:
             'guesses': guess_data
         }
 
-def get_user_all_progress(user_id: int) -> Dict[int, Dict]:
+def get_user_all_progress(user_id: int, force_turso: bool = None) -> Dict[int, Dict]:
     """Get user's progress across all posts"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         # Get progress for each post this user has guessed on (non-deleted only)
         rows = conn.execute("""
-            SELECT 
+            SELECT
                 post_id,
                 COUNT(*) as total_guesses,
                 SUM(is_correct) as correct_guesses
-            FROM user_guesses 
+            FROM user_guesses
             WHERE user_id = ? AND is_deleted = 0
             GROUP BY post_id
         """, (user_id,)).fetchall()
-        
+
         progress = {}
         for row in rows:
-            post_id = row['post_id']
-            total = row['total_guesses']
-            correct = row['correct_guesses']
-            
+            post_id = row[0]
+            total = row[1]
+            correct = row[2]
+
             progress[post_id] = {
                 'total_guesses': total,
                 'correct_guesses': correct,
                 'accuracy': correct / total if total > 0 else 0
             }
-        
+
         return progress
 
-def reset_user_progress(user_id: int, post_id: int) -> bool:
+def reset_user_progress(user_id: int, post_id: int, force_turso: bool = None) -> bool:
     """Reset user's progress on a specific post (soft delete their guesses)"""
-    with get_db_connection() as conn:
+    with get_db_connection(force_turso) as conn:
         cursor = conn.execute("""
-            UPDATE user_guesses 
+            UPDATE user_guesses
             SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP
             WHERE user_id = ? AND post_id = ? AND is_deleted = 0
         """, (user_id, post_id))

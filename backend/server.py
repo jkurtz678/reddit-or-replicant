@@ -263,70 +263,76 @@ def admin_restore_post(post_id: int, x_admin_env: str = Header(None)):
 # User tracking endpoints
 
 @app.post("/api/users/register")
-def register_user(request: UserRegisterRequest):
+def register_user(request: UserRegisterRequest, x_admin_env: str = Header(None)):
     """Register a new anonymous user"""
     try:
-        user_id = get_or_create_user(request.anonymous_id)
+        force_turso = parse_admin_environment(x_admin_env)
+        user_id = get_or_create_user(request.anonymous_id, force_turso)
         return {"message": "User registered successfully", "user_id": user_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to register user: {str(e)}")
 
 @app.post("/api/users/guess")
-def save_guess(request: UserGuessRequest):
+def save_guess(request: UserGuessRequest, x_admin_env: str = Header(None)):
     """Save a user's guess for a comment"""
     try:
+        force_turso = parse_admin_environment(x_admin_env)
         # Get or create user
-        user_id = get_or_create_user(request.anonymous_id)
-        
+        user_id = get_or_create_user(request.anonymous_id, force_turso)
+
         # Save the guess
         success = save_user_guess(
             user_id=user_id,
-            post_id=request.post_id, 
+            post_id=request.post_id,
             comment_id=request.comment_id,
             guess=request.guess,
-            is_correct=request.is_correct
+            is_correct=request.is_correct,
+            force_turso=force_turso
         )
-        
+
         if success:
             return {"message": "Guess saved successfully"}
         else:
             raise HTTPException(status_code=500, detail="Failed to save guess")
-            
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save guess: {str(e)}")
 
 @app.post("/api/users/progress")
-def get_progress(request: UserProgressRequest):
+def get_progress(request: UserProgressRequest, x_admin_env: str = Header(None)):
     """Get user's progress on a specific post"""
     try:
-        user_id = get_or_create_user(request.anonymous_id)
-        progress = get_user_progress(user_id, request.post_id)
+        force_turso = parse_admin_environment(x_admin_env)
+        user_id = get_or_create_user(request.anonymous_id, force_turso)
+        progress = get_user_progress(user_id, request.post_id, force_turso)
         return progress
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get progress: {str(e)}")
 
 @app.get("/api/users/{anonymous_id}/progress")
-def get_all_progress(anonymous_id: str):
+def get_all_progress(anonymous_id: str, x_admin_env: str = Header(None)):
     """Get user's progress across all posts"""
     try:
-        user_id = get_or_create_user(anonymous_id)
-        progress = get_user_all_progress(user_id)
+        force_turso = parse_admin_environment(x_admin_env)
+        user_id = get_or_create_user(anonymous_id, force_turso)
+        progress = get_user_all_progress(user_id, force_turso)
         return {"progress": progress}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get progress: {str(e)}")
 
 @app.post("/api/users/reset-progress")
-def reset_progress(request: ResetProgressRequest):
+def reset_progress(request: ResetProgressRequest, x_admin_env: str = Header(None)):
     """Reset user's progress on a specific post"""
     try:
-        user_id = get_or_create_user(request.anonymous_id)
-        success = reset_user_progress(user_id, request.post_id)
-        
+        force_turso = parse_admin_environment(x_admin_env)
+        user_id = get_or_create_user(request.anonymous_id, force_turso)
+        success = reset_user_progress(user_id, request.post_id, force_turso)
+
         if success:
             return {"message": "Progress reset successfully"}
         else:
             return {"message": "No progress found to reset"}
-            
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reset progress: {str(e)}")
 

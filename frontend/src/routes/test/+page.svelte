@@ -4,7 +4,7 @@
 	import { fade } from 'svelte/transition';
 	import { userManager } from '$lib/user';
 	import { browser } from '$app/environment';
-	import { API_BASE_URL } from '$lib/config';
+	import { databaseManager } from '$lib/environment';
 
 	// Glitch character pool - only ASCII characters that are truly monospace
 	const glitchChars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|\\;:,.<>?/~`';
@@ -80,7 +80,9 @@
 			loading = true;
 			error = '';
 			
-			const response = await fetch(`/api/mixed-comments/${postId}`);
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/mixed-comments/${postId}`, {
+			headers: databaseManager.getHeaders()
+		});
 			if (!response.ok) {
 				if (response.status === 404) {
 					throw new Error('Post not found');
@@ -107,11 +109,9 @@
 		if (!browser || !currentPostId || !anonymousUserId || progressLoaded) return;
 		
 		try {
-			const response = await fetch(`${API_BASE_URL}/api/users/progress`, {
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/users/progress`, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
+				headers: databaseManager.getHeaders(),
 				body: JSON.stringify({
 					anonymous_id: anonymousUserId,
 					post_id: currentPostId
@@ -161,11 +161,9 @@
 		}
 		
 		try {
-			const response = await fetch(`${API_BASE_URL}/api/users/reset-progress`, {
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/users/reset-progress`, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
+				headers: databaseManager.getHeaders(),
 				body: JSON.stringify({
 					anonymous_id: anonymousUserId,
 					post_id: currentPostId
@@ -370,11 +368,9 @@
 		// Save guess to backend (only in browser with valid user ID)
 		if (browser && currentPostId && anonymousUserId) {
 			try {
-				await fetch(`${API_BASE_URL}/api/users/guess`, {
+				await fetch(`${databaseManager.getApiUrl()}/api/users/guess`, {
 					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
+					headers: databaseManager.getHeaders(),
 					body: JSON.stringify({
 						anonymous_id: anonymousUserId,
 						post_id: currentPostId,
