@@ -282,16 +282,16 @@
 	<div class="pt-16">
 	<div class="container mx-auto p-8 md:px-0">
 
-		<!-- Posts List -->
-		{#if loading}
-			<div class="text-center">
-				<div class="animate-pulse text-gray-300">Loading posts...</div>
-			</div>
-		{:else if posts.length > 0}
+		<!-- Header with Add Button (always visible for admins) -->
+		{#if !loading}
 			<div class="max-w-4xl mx-auto">
 				<div class="flex justify-between items-center mb-6">
 					<h2 class="text-xl font-semibold text-white">
-						Replicants hiding in {getSubredditDisplayName(currentSubreddit)}
+						{#if posts.length > 0}
+							Replicants hiding in {getSubredditDisplayName(currentSubreddit)}
+						{:else}
+							{getSubredditDisplayName(currentSubreddit)}
+						{/if}
 					</h2>
 					{#if showAdminFeatures}
 						<button
@@ -305,6 +305,16 @@
 						</button>
 					{/if}
 				</div>
+			</div>
+		{/if}
+
+		<!-- Posts List -->
+		{#if loading}
+			<div class="text-center">
+				<div class="animate-pulse text-gray-300">Loading posts...</div>
+			</div>
+		{:else if posts.length > 0}
+			<div class="max-w-4xl mx-auto">
 				<div class="grid gap-4">
 					{#each posts as post}
 						{@const progressStatus = getProgressStatus(post.id, post.total_count)}

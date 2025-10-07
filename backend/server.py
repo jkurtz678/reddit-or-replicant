@@ -13,7 +13,8 @@ from src.reddit_parser import parse_reddit_json, select_representative_comments
 from src.reddit_fetcher import fetch_reddit_post, extract_post_info, validate_reddit_url
 from src.database import (
     save_post, get_post_by_id, get_all_posts, get_posts_by_subreddit, post_exists, soft_delete_post, restore_post,
-    get_or_create_user, save_user_guess, get_user_progress, get_user_all_progress, reset_user_progress
+    get_or_create_user, save_user_guess, get_user_progress, get_user_all_progress, reset_user_progress,
+    save_evaluation_result
 )
 import anthropic
 from src.gen.generate_mixed_comments import (
@@ -22,6 +23,7 @@ from src.gen.generate_mixed_comments import (
     get_thread_context, insert_ai_comments, MAX_REDDIT_COMMENTS
 )
 from src.reddit_parser import Comment
+from evaluate_comments import CommentEvaluator, CommentData, PostEvaluation
 
 app = FastAPI()
 
@@ -421,6 +423,60 @@ async def submit_reddit_url(request: SubmitURLRequest, x_admin_env: str = Header
             total_count=total_final_comments,
             force_turso=force_turso
         )
+
+        # Run LLM-as-a-judge evaluation
+        try:
+            print("Running LLM-as-a-judge evaluation...")
+            evaluator = CommentEvaluator(client)
+
+            # Convert comments to evaluation format
+            all_flat_comments = flatten_all_comments(mixed_comments)
+            human_comments = [
+                CommentData(
+                    id=i,
+                    text=comment.content,
+                    is_ai=False,
+                    comment_type='top_level' if comment.depth == 0 else 'reply'
+                )
+                for i, comment in enumerate(all_flat_comments) if not comment.is_ai
+            ]
+
+            ai_comments = [
+                CommentData(
+                    id=i,
+                    text=comment.content,
+                    is_ai=True,
+                    comment_type='top_level' if comment.depth == 0 else 'reply'
+                )
+                for i, comment in enumerate(all_flat_comments) if comment.is_ai
+            ]
+
+            post_evaluation = PostEvaluation(
+                post_title=post.title,
+                human_comments=human_comments,
+                ai_comments=ai_comments
+            )
+
+            # Run evaluation
+            eval_results = await evaluator.evaluate_post(post_evaluation)
+
+            # Save evaluation results to database
+            save_evaluation_result(
+                post_id=post_id,
+                mixed_reality_score=eval_results['mixed_reality_score'],
+                diversity_score=eval_results['diversity_score'],
+                appropriateness_score=eval_results['appropriateness_score'],
+                overall_score=eval_results['overall_score'],
+                generation_version="v1.3",  # Simple hardcoded version
+                evaluation_version="v1.1",  # Simple hardcoded version
+                force_turso=force_turso
+            )
+
+            print(f"Evaluation completed: {eval_results}")
+
+        except Exception as e:
+            print(f"Evaluation failed, continuing without evaluation: {str(e)}")
+            # Don't fail the entire post creation if evaluation fails
         
         return {
             "id": post_id,

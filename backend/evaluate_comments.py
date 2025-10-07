@@ -109,7 +109,7 @@ Respond in JSON format:
 
         try:
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-haiku-20240307",
                 max_tokens=1000,
                 temperature=0.1,
                 messages=[{
@@ -160,24 +160,30 @@ AI COMMENTS:
 {ai_comments_text}
 
 Rate 1-10 how DIVERSE these comments are:
-- 10 = Highly diverse (different openings, structures, voices, personalities)
-- 1 = Highly repetitive (same phrases, identical patterns, one personality)
+- 10 = Highly diverse (completely different openings, structures, voices, personalities)
+- 7-9 = Good diversity (some variation but minor similarities)
+- 4-6 = Moderate diversity (noticeable patterns but still some variation)
+- 2-3 = Poor diversity (obvious repetitive patterns, similar openings/structures)
+- 1 = Extremely repetitive (identical patterns, same phrases, cookie-cutter responses)
 
-Look for:
-- Repeated opening phrases
-- Identical sentence structures
-- Same "voice" or personality
-- Similar transition words
+CRITICAL: Look specifically for:
+- Identical or near-identical opening phrases (e.g., "I used to work at...", "My uncle worked at...")
+- Same sentence structures and paragraph patterns
+- Repeated personal anecdote formats ("I/my relative did X and saw Y")
+- Similar parenthetical clarifications
+- Identical voice/personality across comments
+
+If 2+ comments start with essentially the same phrase or follow identical structural patterns, score 3 or lower.
 
 Respond in JSON format:
 {{
-  "diversity_score": 6,
-  "main_issue": "3 comments start with same phrase"
+  "diversity_score": 2,
+  "main_issue": "Multiple comments use identical opening patterns"
 }}"""
 
         try:
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-haiku-20240307",
                 max_tokens=500,
                 temperature=0.1,
                 messages=[{
@@ -233,7 +239,7 @@ Respond in JSON format:
 
         try:
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-3-haiku-20240307",
                 max_tokens=500,
                 temperature=0.1,
                 messages=[{

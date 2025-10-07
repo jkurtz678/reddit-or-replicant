@@ -225,7 +225,7 @@
 	// Get result message based on accuracy
 	function getResultMessage(accuracy: number): string {
 		if (accuracy >= 0.9) {
-			return "Exceptional. Your detection algorithms are operating at near-human levels. The line between artificial and authentic continues to blur.";
+			return "Exceptional performance. Your detection skills are highly refined - you've identified the vast majority of replicants while avoiding false positives.";
 		} else if (accuracy >= 0.8) {
 			return "Impressive performance. You've shown remarkable ability to distinguish replicants from humans, but some still slip through undetected.";
 		} else if (accuracy >= 0.7) {

@@ -102,6 +102,21 @@ def init_database():
             )
         """)
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS evaluation_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id INTEGER NOT NULL,
+                mixed_reality_score REAL NOT NULL,
+                diversity_score REAL NOT NULL,
+                appropriateness_score REAL NOT NULL,
+                overall_score REAL NOT NULL,
+                generation_prompt_version TEXT NOT NULL,
+                evaluation_prompt_version TEXT NOT NULL,
+                evaluated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (post_id) REFERENCES posts (id)
+            )
+        """)
+
         conn.commit()
     finally:
         conn.close()
@@ -374,6 +389,49 @@ def reset_user_progress(user_id: int, post_id: int, force_turso: bool = None) ->
         """, (user_id, post_id))
         conn.commit()
         return cursor.rowcount > 0
+
+# Evaluation functions
+
+def save_evaluation_result(post_id: int, mixed_reality_score: float, diversity_score: float,
+                          appropriateness_score: float, overall_score: float,
+                          generation_version: str, evaluation_version: str,
+                          force_turso: bool = None) -> int:
+    """Save evaluation results for a post"""
+    with get_db_connection(force_turso) as conn:
+        cursor = conn.execute("""
+            INSERT INTO evaluation_results
+            (post_id, mixed_reality_score, diversity_score, appropriateness_score,
+             overall_score, generation_prompt_version, evaluation_prompt_version)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (post_id, mixed_reality_score, diversity_score, appropriateness_score,
+              overall_score, generation_version, evaluation_version))
+        conn.commit()
+        return cursor.lastrowid
+
+def get_evaluation_results(post_id: int, force_turso: bool = None) -> Dict:
+    """Get evaluation results for a post"""
+    with get_db_connection(force_turso) as conn:
+        row = conn.execute("""
+            SELECT mixed_reality_score, diversity_score, appropriateness_score,
+                   overall_score, generation_prompt_version, evaluation_prompt_version,
+                   evaluated_at
+            FROM evaluation_results
+            WHERE post_id = ?
+            ORDER BY evaluated_at DESC
+            LIMIT 1
+        """, (post_id,)).fetchone()
+
+        if row:
+            return {
+                'mixed_reality_score': row[0],
+                'diversity_score': row[1],
+                'appropriateness_score': row[2],
+                'overall_score': row[3],
+                'generation_prompt_version': row[4],
+                'evaluation_prompt_version': row[5],
+                'evaluated_at': row[6]
+            }
+        return None
 
 # Initialize database on module import
 init_database()

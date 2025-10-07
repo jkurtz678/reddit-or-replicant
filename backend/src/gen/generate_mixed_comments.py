@@ -24,7 +24,7 @@ from .comment_legacy import generate_ai_comments_legacy
 
 # Constants
 MAX_REDDIT_COMMENTS = 12
-USE_ARCHETYPE_SYSTEM = False
+USE_ARCHETYPE_SYSTEM = True
 
 # Initialize Faker for username generation
 fake = Faker()
@@ -174,24 +174,69 @@ def get_score_range(real_comments: List[Comment]) -> tuple[int, int]:
 
 def generate_single_ai_comment(post_title: str, post_content: str, subreddit: str,
                               real_comments: List[Comment], archetype_key: str,
-                              anthropic_client: anthropic.Anthropic) -> Comment:
+                              anthropic_client: anthropic.Anthropic,
+                              previously_generated: List[Comment] = None) -> Comment:
     """Generate a single AI comment using a specific archetype"""
     
-    # Sample a few real comments for context
+    # Sample a few real comments for context and length examples
     sample_comments = random.sample(real_comments, min(3, len(real_comments)))
+
+    # Create examples showing the variety of real comment lengths
     examples = "\n".join([
-        f"- u/{comment.author}: {comment.content[:150]}{'...' if len(comment.content) > 150 else ''}"
+        f"- u/{comment.author} ({len(comment.content.split())} words): {comment.content[:150]}{'...' if len(comment.content) > 150 else ''}"
         for comment in sample_comments
     ])
-    
-    # Build the full prompt using the archetype system
-    prompt = build_full_prompt(
+
+    # Add previously generated comments to avoid repetition
+    avoid_repetition_text = ""
+    if previously_generated:
+        avoid_repetition_text = "\n\nPREVIOUSLY GENERATED AI COMMENTS (DO NOT REPEAT THESE PATTERNS):\n"
+        for i, prev_comment in enumerate(previously_generated[-7:]):  # Show up to 7 previous comments to catch patterns
+            opening = prev_comment.content.split('.')[0] if '.' in prev_comment.content else prev_comment.content[:50]
+            avoid_repetition_text += f"- AI Comment {i+1} opening: \"{opening}...\"\n"
+        avoid_repetition_text += "\nIMPORTANT: Avoid starting with similar phrases, structures, or personal anecdotes as the AI comments above.\n"
+
+    # Get length statistics from real comments for guidance
+    real_word_counts = [len(comment.content.split()) for comment in flatten_all_comments(real_comments)]
+    avg_length = sum(real_word_counts) / len(real_word_counts) if real_word_counts else 20
+    min_length = min(real_word_counts) if real_word_counts else 5
+    max_length = max(real_word_counts) if real_word_counts else 50
+
+    # Pick a target length based on the real comment distribution
+    # Bias toward shorter comments (most Reddit comments are brief)
+    rand_val = random.random()
+    if rand_val < 0.4:  # 40% chance of very short
+        target_length = min(15, max_length)
+    elif rand_val < 0.7:  # 30% chance of medium
+        target_length = min(30, max_length)
+    else:  # 30% chance of longer
+        target_length = min(max_length, 50)  # Cap at 50 words max
+
+    length_guidance = f"""
+CRITICAL LENGTH REQUIREMENT:
+- Your response MUST be {target_length} words or fewer
+- Real comments here: {min_length}-{max_length} words (avg: {avg_length:.0f})
+- TARGET FOR THIS COMMENT: {target_length} words maximum
+- Count your words carefully - responses over {target_length} words will be rejected
+- Most Reddit comments are brief and to the point, not explanatory essays"""
+
+    # Build the full prompt using the archetype system with our enhancements
+    base_prompt = build_full_prompt(
         archetype_key=archetype_key,
         subreddit=subreddit,
         post_title=post_title,
         post_content=post_content,
         real_comment_examples=examples
     )
+
+    # Enhance the prompt with our repetition prevention and length guidance
+    prompt = f"""{base_prompt}{avoid_repetition_text}{length_guidance}
+
+CRITICAL REMINDERS:
+- Be unique and unexpected - avoid cliché openings like "I used to work at..." or "My [relative] said..."
+- Vary your comment length to match real Reddit patterns
+- Don't repeat patterns from previously generated AI comments
+- Sound natural and human, not like you're trying to be comprehensive or helpful"""
     
     try:
         response = anthropic_client.messages.create(
@@ -261,38 +306,56 @@ def generate_single_ai_comment(post_title: str, post_content: str, subreddit: st
 def generate_ai_comments_with_archetypes(post_title: str, post_content: str, subreddit: str,
                                         real_comments: List[Comment], num_to_generate: int,
                                         anthropic_client: anthropic.Anthropic) -> List[Comment]:
-    """Generate AI comments using the archetype system"""
-    
+    """Generate AI comments using the archetype system with repetition prevention"""
+
     # Step 1: Get appropriate archetypes for this post
     appropriate_archetypes = get_appropriate_archetypes(
         post_title, post_content, subreddit, anthropic_client
     )
-    
+
     if not appropriate_archetypes:
         print("No appropriate archetypes found, cannot generate AI comments")
         return []
-    
-    # Step 2: Generate individual comments using random archetypes
+
+    # Step 2: Create a pool of archetypes with limited repetition
+    # Allow each archetype to be used at most twice to prevent over-repetition
+    archetype_pool = []
+    max_uses_per_archetype = min(2, max(1, num_to_generate // len(appropriate_archetypes)))
+
+    for archetype in appropriate_archetypes:
+        archetype_pool.extend([archetype] * max_uses_per_archetype)
+
+    # If we need more archetypes than available, add extras randomly
+    while len(archetype_pool) < num_to_generate:
+        archetype_pool.append(random.choice(appropriate_archetypes))
+
+    # Shuffle the pool
+    random.shuffle(archetype_pool)
+
+    print(f"Archetype distribution: {max_uses_per_archetype} uses per archetype max")
+
+    # Step 3: Generate individual comments using archetypes from the pool
     ai_comments = []
     for i in range(num_to_generate):
-        # Randomly select an archetype from the appropriate ones
-        selected_archetype = random.choice(appropriate_archetypes)
-        
-        # Generate single comment with this archetype
+        # Select archetype from pool (no repeats beyond our limit)
+        selected_archetype = archetype_pool[i] if i < len(archetype_pool) else random.choice(appropriate_archetypes)
+
+        # Generate single comment with this archetype, passing previously generated comments
         comment = generate_single_ai_comment(
             post_title=post_title,
             post_content=post_content,
             subreddit=subreddit,
             real_comments=real_comments,
             archetype_key=selected_archetype,
-            anthropic_client=anthropic_client
+            anthropic_client=anthropic_client,
+            previously_generated=ai_comments  # Pass previous comments to avoid repetition
         )
-        
+
         if comment:
             ai_comments.append(comment)
         else:
             print(f"Failed to generate comment {i+1}/{num_to_generate}")
-    
+
     print(f"Successfully generated {len(ai_comments)}/{num_to_generate} AI comments using archetypes")
     return ai_comments
 
@@ -389,6 +452,12 @@ Generate 1 realistic Reddit reply to this comment. The reply should:
 3. Sound natural and human-written
 4. Use a generic, unrelated username (NOT topic-related)
 5. Vary in style (could be short reaction, longer response, question, anecdote, etc.)
+
+CRITICAL REPLY FORMATTING:
+- NEVER start with "u/username:" - real Reddit replies don't do this
+- Jump straight into your response without addressing the username
+- Real examples: "Yeah, exactly this." NOT "u/someone: Yeah, exactly this."
+- If you need to reference them, use "you" or just reply directly
 
 CRITICAL: Make this indistinguishable from a real human reply. Don't try too hard to sound "Reddit-y".
 

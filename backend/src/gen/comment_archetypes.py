@@ -201,6 +201,35 @@ COMMENT STYLE: You seek nuance and middle ground in polarizing opinions.
 
 Example tone: "I partially agree, but I think you're overlooking..."
 """
+        },
+
+        'direct_challenger': {
+            'description': 'Asks pointed questions that challenge the premise',
+            'prompt': """
+COMMENT STYLE: You challenge the opinion with direct, pointed questions or logical pushback.
+- Keep it SHORT (10-25 words max)
+- Ask questions that poke holes in their logic
+- Use "Then you should..." or "So if..." constructions
+- Challenge their consistency or implications
+- Be direct but not aggressive
+- Focus on one specific flaw or contradiction
+
+Example tone: "Then you should support X, right?" or "So if that's true, why don't you...?"
+"""
+        },
+
+        'skeptical_questioner': {
+            'description': 'Short skeptical questions about edge cases',
+            'prompt': """
+COMMENT STYLE: You ask short, skeptical questions about edge cases or exceptions.
+- Keep it VERY SHORT (15-30 words max)
+- Point out potential contradictions with simple scenarios
+- Use "So if..." or "What about when..." constructions
+- Focus on practical situations that complicate their view
+- Be genuinely questioning, not argumentative
+
+Example tone: "So if you buy a rundown house and fix it up, you should sell for the same price?"
+"""
         }
     },
     
@@ -286,6 +315,20 @@ COMMENT STYLE: You ask follow-up questions to better understand the situation.
 - Use casual question formats
 
 Example tone: "wait, did he actually say that? need more context"
+"""
+        },
+
+        'simple_agreement': {
+            'description': 'Short, enthusiastic agreement (5-15 words)',
+            'prompt': """
+COMMENT STYLE: You provide brief, enthusiastic agreement without elaborate explanation.
+- Keep it VERY SHORT (5-15 words total)
+- Use phrases like "Absolutely!" "Exactly this!" "100% agree" "This is it"
+- Add minimal elaboration - just the core agreement
+- Be enthusiastic but concise
+- Don't over-explain or add long reasoning
+
+Example tone: "Absolutely, 100%. That's exactly it." or "This is spot on."
 """
         }
     }
