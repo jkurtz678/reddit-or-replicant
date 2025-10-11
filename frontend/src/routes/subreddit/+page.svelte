@@ -6,7 +6,7 @@
 		{
 			name: 'unpopularopinion',
 			display: 'r/unpopularopinion',
-			description: 'Controversial takes and unconventional perspectives from everyday people.'
+			description: 'Controversial takes and unconventional perspectives that go against the grain.'
 		},
 		{
 			name: 'AmItheAsshole',

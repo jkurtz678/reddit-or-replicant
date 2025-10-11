@@ -4,12 +4,31 @@
 
 	let canvas: HTMLCanvasElement;
 	let animationId: number;
+	let vantaEffect: any;
 
 	function takeTest() {
 		goto('/subreddit');
 	}
 
 	onMount(() => {
+		// Initialize Vanta.js fog effect
+		if (typeof window !== 'undefined' && (window as any).VANTA) {
+			vantaEffect = (window as any).VANTA.FOG({
+				el: "#vanta-bg",
+				mouseControls: true,
+				touchControls: true,
+				gyroControls: false,
+				minHeight: 200.00,
+				minWidth: 200.00,
+				highlightColor: 0x222222,
+				midtoneColor: 0x101010,
+				lowlightColor: 0x0,
+				baseColor: 0x0,
+				blurFactor: 0.45,
+				zoom: 0.70
+			});
+		}
+
 		if (!canvas) return;
 
 		const gl = canvas.getContext('webgl');
@@ -198,12 +217,22 @@
 		if (animationId) {
 			cancelAnimationFrame(animationId);
 		}
+		if (vantaEffect) {
+			vantaEffect.destroy();
+		}
 	});
 </script>
 
 <!-- Shader background canvas -->
 <!-- <canvas bind:this={canvas} class="fixed inset-0 w-full h-full" style="z-index: -1;"></canvas> -->
 
+<svelte:head>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
+</svelte:head>
+
+<!-- Vanta.js background -->
+<div id="vanta-bg" class="fixed inset-0 w-full h-full" style="z-index: -1;"></div>
 
 <div class="min-h-screen text-gray-100 flex items-center justify-center relative z-10">
 	<div class="text-center max-w-3xl mx-auto px-8">
