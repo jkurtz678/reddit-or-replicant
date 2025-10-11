@@ -452,7 +452,7 @@
 						<a href={currentSubreddit ? `/subreddit/${currentSubreddit}` : '/subreddit'} class="transition-colors flex items-center gap-1" style="color: #00d4ff;" on:mouseenter={(e) => e.target.style.color='#33e0ff'} on:mouseleave={(e) => e.target.style.color='#00d4ff'}>
 							← Back
 						</a>
-						<h1 class="text-lg font-bold" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
+						<h1 class="text-lg font-bold hidden sm:block" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
 							Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
 						</h1>
 					</div>
@@ -504,8 +504,16 @@
 			{#if redditData.post}
 				<div class="border-b border-gray-700 p-6">
 					<div class="mb-4">
-						<span class="text-sm" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);">r/{redditData.post.subreddit}</span>
-						<span class="text-sm text-gray-400 ml-2">• Posted by u/{redditData.post.author}</span>
+						<!-- Desktop Layout -->
+						<div class="hidden sm:block">
+							<span class="text-sm" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);">r/{redditData.post.subreddit}</span>
+							<span class="text-sm text-gray-400 ml-2">• Posted by u/{redditData.post.author}</span>
+						</div>
+						<!-- Mobile Layout -->
+						<div class="sm:hidden">
+							<div class="text-sm" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);">r/{redditData.post.subreddit}</div>
+							<div class="text-sm text-gray-400">Posted by u/{redditData.post.author}</div>
+						</div>
 					</div>
 					<h1 class="text-2xl font-bold mb-4" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">{redditData.post.title}</h1>
 					{#if redditData.post.content}
@@ -575,9 +583,10 @@
 												</button>
 											</div>
 										{:else}
-											<div class="flex gap-3 items-center">
+											<!-- Desktop Layout -->
+											<div class="hidden sm:flex gap-3 items-center">
 												<span class="text-xs text-gray-400">Origin:</span>
-												<button 
+												<button
 													class="px-2 py-1 rounded text-xs cursor-not-allowed"
 													class:bg-cyan-700={guessState.userGuess === 'reddit'}
 													class:bg-gray-600={guessState.userGuess !== 'reddit'}
@@ -587,7 +596,7 @@
 												>
 													Reddit {guessState.userGuess === 'reddit' ? '✓' : ''}
 												</button>
-												<button 
+												<button
 													class="px-2 py-1 rounded text-xs cursor-not-allowed"
 													class:bg-red-700={guessState.userGuess === 'replicant'}
 													class:bg-gray-600={guessState.userGuess !== 'replicant'}
@@ -598,6 +607,40 @@
 													Replicant {guessState.userGuess === 'replicant' ? '✓' : ''}
 												</button>
 												<div class="text-xs ml-2" in:fade={{ duration: 300, delay: 100 }}>
+													{#if guessState.correct}
+														<span style="color: #4ade80;">✓ {flatComment.is_ai ? 'Replicant identified' : 'Reddit origin confirmed'}.</span>
+													{:else}
+														<span style="color: #f87171;">✗ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
+													{/if}
+												</div>
+											</div>
+
+											<!-- Mobile Layout -->
+											<div class="sm:hidden">
+												<div class="flex gap-3 items-center mb-2">
+													<span class="text-xs text-gray-400">Origin:</span>
+													<button
+														class="px-2 py-1 rounded text-xs cursor-not-allowed"
+														class:bg-cyan-700={guessState.userGuess === 'reddit'}
+														class:bg-gray-600={guessState.userGuess !== 'reddit'}
+														class:text-white={guessState.userGuess === 'reddit'}
+														class:text-gray-400={guessState.userGuess !== 'reddit'}
+														disabled
+													>
+														Reddit {guessState.userGuess === 'reddit' ? '✓' : ''}
+													</button>
+													<button
+														class="px-2 py-1 rounded text-xs cursor-not-allowed"
+														class:bg-red-700={guessState.userGuess === 'replicant'}
+														class:bg-gray-600={guessState.userGuess !== 'replicant'}
+														class:text-white={guessState.userGuess === 'replicant'}
+														class:text-gray-400={guessState.userGuess !== 'replicant'}
+														disabled
+													>
+														Replicant {guessState.userGuess === 'replicant' ? '✓' : ''}
+													</button>
+												</div>
+												<div class="text-xs" in:fade={{ duration: 300, delay: 100 }}>
 													{#if guessState.correct}
 														<span style="color: #4ade80;">✓ {flatComment.is_ai ? 'Replicant identified' : 'Reddit origin confirmed'}.</span>
 													{:else}

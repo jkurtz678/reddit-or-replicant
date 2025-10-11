@@ -264,7 +264,7 @@
 					<a href="/subreddit" class="transition-colors flex items-center gap-1" style="color: #00d4ff;" >
 						← Back
 					</a>
-					<a href="/" class="text-lg font-bold cursor-pointer hover:text-blue-300 transition-colors" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
+					<a href="/" class="text-lg font-bold cursor-pointer hover:text-blue-300 transition-colors hidden sm:block" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
 						Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
 					</a>
 				</div>
@@ -285,7 +285,8 @@
 		<!-- Header with Add Button (always visible for admins) -->
 		{#if !loading}
 			<div class="max-w-4xl mx-auto">
-				<div class="flex justify-between items-center mb-6">
+				<!-- Desktop Layout -->
+				<div class="hidden sm:flex justify-between items-center mb-6">
 					<h2 class="text-xl font-semibold text-white">
 						{#if posts.length > 0}
 							Replicants hiding in {getSubredditDisplayName(currentSubreddit)}
@@ -297,6 +298,28 @@
 						<button
 							on:click={openDialog}
 							class="px-4 py-2 text-white rounded transition-all duration-200 cursor-pointer hover:scale-105"
+							style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+							on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
+							on:mouseleave={(e) => e.target.style.boxShadow = ''}
+						>
+							+ Add New Post
+						</button>
+					{/if}
+				</div>
+
+				<!-- Mobile Layout -->
+				<div class="sm:hidden mb-6">
+					<h2 class="text-xl font-semibold text-white mb-4">
+						{#if posts.length > 0}
+							Replicants hiding in {getSubredditDisplayName(currentSubreddit)}
+						{:else}
+							{getSubredditDisplayName(currentSubreddit)}
+						{/if}
+					</h2>
+					{#if showAdminFeatures}
+						<button
+							on:click={openDialog}
+							class="w-full px-4 py-2 text-white rounded transition-all duration-200 cursor-pointer hover:scale-105"
 							style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
 							on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
 							on:mouseleave={(e) => e.target.style.boxShadow = ''}
@@ -332,7 +355,8 @@
 							role={!post.is_deleted ? "button" : ""}
 							tabindex={!post.is_deleted ? 0 : -1}
 						>
-							<div class="flex justify-between items-start">
+							<!-- Desktop Layout -->
+							<div class="hidden sm:flex justify-between items-start">
 								<div class="flex-1">
 									<div class="flex items-center gap-2 mb-2">
 										<h3 class="font-medium text-white text-lg">{post.title}</h3>
@@ -345,10 +369,6 @@
 									<div class="text-sm text-gray-400 mb-2">
 										<span style="color: #00d4ff;">r/{post.subreddit}</span>
 										• {post.total_count} comments
-										{#if showAdminFeatures}
-											({post.ai_count} AI, {post.total_count - post.ai_count} real)
-											• {Math.round((post.ai_count / post.total_count) * 100)}% AI
-										{/if}
 									</div>
 									{#if showAdminFeatures}
 										<div class="text-xs text-gray-500">
@@ -407,20 +427,102 @@
 									{/if}
 								</div>
 							</div>
+
+							<!-- Mobile Layout -->
+							<div class="sm:hidden">
+								<!-- Title spans full width -->
+								<div class="flex items-center gap-2 mb-3">
+									<h3 class="font-medium text-white text-lg">{post.title}</h3>
+									{#if post.is_deleted}
+										<span class="px-2 py-1 text-xs rounded text-amber-200 bg-amber-900/30 border border-amber-700/50">
+											Deleted
+										</span>
+									{/if}
+								</div>
+
+								<!-- Subreddit info and buttons on same line -->
+								<div class="flex justify-between items-center">
+									<div>
+										<div class="text-sm text-gray-400 mb-1">
+											<div><span style="color: #00d4ff;">r/{post.subreddit}</span></div>
+											<div>{post.total_count} comments</div>
+										</div>
+										{#if userPostProgress && userPostProgress.total_guesses > 0}
+											<div class="text-xs text-gray-400">
+												{userPostProgress.total_guesses} guessed ({userPostProgress.correct_guesses} correct)
+											</div>
+										{/if}
+										{#if showAdminFeatures}
+											<div class="text-xs text-gray-500">
+												Added {new Date(post.created_at).toLocaleDateString()}
+												{#if post.is_deleted && post.deleted_at}
+													• Deleted {new Date(post.deleted_at).toLocaleDateString()}
+												{/if}
+											</div>
+										{/if}
+									</div>
+
+									<div class="flex flex-col gap-2 items-end ml-4">
+										{#if !post.is_deleted}
+											<button
+												class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
+												style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+												on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
+												on:mouseleave={(e) => e.target.style.boxShadow = ''}
+												on:click|stopPropagation={() => playGame(post.id)}
+											>
+												{#if progressStatus === 'completed'}
+													Review ({Math.round(userPostProgress.accuracy * 100)}% accuracy)
+												{:else if progressStatus === 'in-progress'}
+													Continue
+												{:else}
+													Begin Test
+												{/if}
+											</button>
+											{#if showAdminFeatures}
+												<button
+													on:click|stopPropagation={() => deletePost(post.id)}
+													class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
+													style="background: linear-gradient(135deg, #7f1d1d, #dc2626); border: 1px solid rgba(220, 38, 38, 0.3);"
+													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(220, 38, 38, 0.4)'}
+													on:mouseleave={(e) => e.target.style.boxShadow = ''}
+												>
+													Delete
+												</button>
+											{/if}
+										{:else if showAdminFeatures}
+											<button
+												on:click|stopPropagation={() => restorePost(post.id)}
+												class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
+												style="background: linear-gradient(135deg, #166534, #16a34a); border: 1px solid rgba(34, 197, 94, 0.3);"
+												on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(34, 197, 94, 0.4)'}
+												on:mouseleave={(e) => e.target.style.boxShadow = ''}
+											>
+												Restore
+											</button>
+										{/if}
+									</div>
+								</div>
+							</div>
 						</div>
 					{/each}
 				</div>
 			</div>
 		{:else}
 			<div class="text-center text-gray-400 max-w-2xl mx-auto">
-				<h2 class="text-xl font-semibold mb-4 text-white">
-					No posts found in {getSubredditDisplayName(currentSubreddit)}
-				</h2>
+				<h3 class="text-lg font-medium mb-4 text-white">
+					No posts found
+				</h3>
 				<p class="mb-6">
-					There are currently no posts available for this subreddit. Check back later or try a different community.
+					There are currently no posts available for this subreddit.
+					{#if showAdminFeatures}
+						Click "Add New Post" above to submit a Reddit URL, or try a different community.
+					{:else}
+						Check back later or try a different community.
+					{/if}
 				</p>
-				<a 
-					href="/subreddit" 
+				<a
+					href="/subreddit"
 					class="px-6 py-3 text-white rounded transition-all duration-200 cursor-pointer hover:scale-105 inline-block"
 					style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
 					on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
