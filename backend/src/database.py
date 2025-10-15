@@ -65,7 +65,7 @@ def init_database():
         conn.execute("""
             CREATE TABLE IF NOT EXISTS posts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                reddit_url TEXT UNIQUE NOT NULL,
+                reddit_url TEXT NOT NULL,
                 title TEXT NOT NULL,
                 subreddit TEXT NOT NULL,
                 mixed_comments_json TEXT NOT NULL,
@@ -96,6 +96,7 @@ def init_database():
                 guessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 is_deleted INTEGER DEFAULT 0,
                 deleted_at TIMESTAMP NULL,
+                flagged_as_obvious INTEGER DEFAULT 0,
                 FOREIGN KEY (user_id) REFERENCES users (id),
                 FOREIGN KEY (post_id) REFERENCES posts (id),
                 UNIQUE(user_id, post_id, comment_id)
@@ -117,9 +118,27 @@ def init_database():
             )
         """)
 
+        # Run migrations for existing databases
+        _run_migrations(conn)
+
         conn.commit()
     finally:
         conn.close()
+
+def _run_migrations(conn):
+    """Run database migrations for existing installations"""
+    # Check if new columns exist and add them if they don't
+
+    # Add generation_prompt and archetype_used to posts table (store in mixed_comments_json for now)
+    # We'll store these fields in the individual comment objects within the JSON
+
+    # Add flagged_as_obvious to user_guesses table
+    try:
+        # Check if flagged_as_obvious column exists
+        conn.execute("SELECT flagged_as_obvious FROM user_guesses LIMIT 1")
+    except:
+        # Column doesn't exist, add it
+        conn.execute("ALTER TABLE user_guesses ADD COLUMN flagged_as_obvious INTEGER DEFAULT 0")
 
 @contextmanager
 def get_db_connection(force_turso: bool = None):
@@ -150,16 +169,31 @@ def get_db_connection(force_turso: bool = None):
             conn.close()
 
 def save_post(reddit_url: str, title: str, subreddit: str,
-              mixed_comments_data: dict, ai_count: int, total_count: int, force_turso: bool = None) -> int:
+              mixed_comments_data: dict, ai_count: int, total_count: int,
+              force_turso: bool = None, overwrite_existing: bool = False) -> int:
     """
     Save a processed Reddit post with mixed comments to the database
-    
+
+    Args:
+        overwrite_existing: If True, delete any existing post with the same URL
+
     Returns:
         The ID of the saved post
     """
     mixed_comments_json = json.dumps(mixed_comments_data)
-    
+
     with get_db_connection(force_turso) as conn:
+        if overwrite_existing:
+            # Get the post ID first to clean up related data
+            existing_post = conn.execute("SELECT id FROM posts WHERE reddit_url = ?", (reddit_url,)).fetchone()
+            if existing_post:
+                post_id = existing_post[0]
+                # Delete related data that might cause foreign key constraints
+                conn.execute("DELETE FROM user_guesses WHERE post_id = ?", (post_id,))
+                conn.execute("DELETE FROM evaluation_results WHERE post_id = ?", (post_id,))
+                # Delete the post itself
+                conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+
         cursor = conn.execute("""
             INSERT INTO posts (reddit_url, title, subreddit, mixed_comments_json, ai_count, total_count)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -321,8 +355,8 @@ def save_user_guess(user_id: int, post_id: int, comment_id: str, guess: str, is_
     with get_db_connection(force_turso) as conn:
         cursor = conn.execute("""
             INSERT OR REPLACE INTO user_guesses
-            (user_id, post_id, comment_id, guess, is_correct, guessed_at)
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            (user_id, post_id, comment_id, guess, is_correct, guessed_at, flagged_as_obvious)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 0)
         """, (user_id, post_id, comment_id, guess, int(is_correct)))
         conn.commit()
         return cursor.rowcount > 0
@@ -332,13 +366,13 @@ def get_user_progress(user_id: int, post_id: int, force_turso: bool = None) -> D
     with get_db_connection(force_turso) as conn:
         # Get all non-deleted guesses for this user/post
         guesses = conn.execute("""
-            SELECT comment_id, guess, is_correct, guessed_at
+            SELECT comment_id, guess, is_correct, guessed_at, flagged_as_obvious
             FROM user_guesses
             WHERE user_id = ? AND post_id = ? AND is_deleted = 0
             ORDER BY guessed_at
         """, (user_id, post_id)).fetchall()
 
-        guess_data = [dict(zip(['comment_id', 'guess', 'is_correct', 'guessed_at'], row)) for row in guesses]
+        guess_data = [dict(zip(['comment_id', 'guess', 'is_correct', 'guessed_at', 'flagged_as_obvious'], row)) for row in guesses]
 
         # Calculate stats
         total_guesses = len(guess_data)
@@ -387,6 +421,17 @@ def reset_user_progress(user_id: int, post_id: int, force_turso: bool = None) ->
             SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP
             WHERE user_id = ? AND post_id = ? AND is_deleted = 0
         """, (user_id, post_id))
+        conn.commit()
+        return cursor.rowcount > 0
+
+def flag_comment_as_obvious(user_id: int, post_id: int, comment_id: str, force_turso: bool = None) -> bool:
+    """Flag a user's correct replicant guess as too obvious"""
+    with get_db_connection(force_turso) as conn:
+        cursor = conn.execute("""
+            UPDATE user_guesses
+            SET flagged_as_obvious = 1
+            WHERE user_id = ? AND post_id = ? AND comment_id = ? AND is_deleted = 0
+        """, (user_id, post_id, comment_id))
         conn.commit()
         return cursor.rowcount > 0
 

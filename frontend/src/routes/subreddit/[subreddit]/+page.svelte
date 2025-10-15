@@ -30,6 +30,7 @@
 	let submitting = false;
 	let error = '';
 	let redditUrl = '';
+	let overwriteExisting = false;
 	let showSubmitDialog = false;
 	let dialogVisible = false;
 	let userProgress: Record<number, UserProgress> = {};
@@ -165,7 +166,10 @@
 			const response = await fetch(`${databaseManager.getApiUrl()}/api/posts/submit`, {
 				method: 'POST',
 				headers: databaseManager.getHeaders(),
-				body: JSON.stringify({ url: redditUrl.trim() }),
+				body: JSON.stringify({
+					url: redditUrl.trim(),
+					overwrite_existing: overwriteExisting
+				}),
 			});
 
 			if (!response.ok) {
@@ -178,6 +182,7 @@
 
 			// Clear the input, close dialog, and reload data
 			redditUrl = '';
+			overwriteExisting = false;
 			closeDialog();
 			await loadAllData();
 
@@ -583,7 +588,19 @@
 					{submitting ? 'Processing...' : 'Submit & Play'}
 				</button>
 			</div>
-			
+
+			<div class="mt-3">
+				<label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+					<input
+						type="checkbox"
+						bind:checked={overwriteExisting}
+						class="rounded bg-gray-800 border-gray-600 text-blue-500 focus:ring-blue-500 focus:ring-2"
+						disabled={submitting}
+					/>
+					Overwrite existing post (if URL already processed)
+				</label>
+			</div>
+
 			{#if error}
 				<div class="mt-3 text-amber-400 text-sm">{error}</div>
 			{/if}

@@ -21,6 +21,7 @@
 	let submitting = false;
 	let error = '';
 	let redditUrl = '';
+	let overwriteExisting = false;
 	let showSubmitDialog = false;
 	let dialogVisible = false;
 	let currentEnvironment: AdminEnvironment = 'local';
@@ -81,7 +82,10 @@
 			const response = await fetch(adminEnvironment.getApiUrl() + '/api/posts/submit', {
 				method: 'POST',
 				headers: adminEnvironment.getHeaders(),
-				body: JSON.stringify({ url: redditUrl.trim() }),
+				body: JSON.stringify({
+					url: redditUrl.trim(),
+					overwrite_existing: overwriteExisting
+				}),
 			});
 			
 			if (!response.ok) {
@@ -94,6 +98,7 @@
 			
 			// Clear input, close dialog, and reload posts
 			redditUrl = '';
+			overwriteExisting = false;
 			closeDialog();
 			await loadPosts();
 			
@@ -344,14 +349,26 @@
 					{submitting ? 'Processing...' : 'Submit'}
 				</button>
 			</div>
-			
+
+			<div class="mt-3">
+				<label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+					<input
+						type="checkbox"
+						bind:checked={overwriteExisting}
+						class="rounded bg-gray-800 border-gray-600 text-blue-500 focus:ring-blue-500 focus:ring-2"
+						disabled={submitting}
+					/>
+					Overwrite existing post (if URL already processed)
+				</label>
+			</div>
+
 			{#if error}
 				<div class="mt-3 text-amber-400 text-sm">{error}</div>
 			{/if}
 			
-			<div class="mt-3 text-gray-400 text-sm">
+			<!-- <div class="mt-3 text-gray-400 text-sm">
 				Paste any Reddit post URL. We'll fetch the comments, generate AI comments, and create a guessing game.
-			</div>
+			</div> -->
 		</div>
 	</div>
 {/if}

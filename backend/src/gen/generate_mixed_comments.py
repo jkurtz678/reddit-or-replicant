@@ -290,7 +290,9 @@ CRITICAL REMINDERS:
             depth=0,
             parent_id=None,
             replies=[],
-            is_ai=True
+            is_ai=True,
+            generation_prompt=prompt,
+            archetype_used=archetype_key
         )
         
         print(f"Generated comment with archetype {archetype_key}: {comment.content[:50]}...")

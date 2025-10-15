@@ -51,6 +51,13 @@
 	let resultsDialogVisible = false;
 	let resultsShown = false;
 	let justMadeGuess = false;
+	let showFeedbackDialog = false;
+	let feedbackDialogVisible = false;
+	let feedbackCommentId = '';
+	let feedbackCommentContent = '';
+	let feedbackSubmitting = false;
+	let flaggedComments = new Set();
+	let postExpanded = false;
 
 	// Initialize user ID when in browser
 	$: if (browser && !anonymousUserId) {
@@ -141,6 +148,9 @@
 			// Reset guessing state (will be restored from backend if exists)
 			guessedComments = new Map();
 
+			// Reset post expansion state
+			postExpanded = false;
+
 			// Restore guessing state from backend if progress exists
 			if (progressData && progressData.guesses && progressData.guesses.length > 0) {
 				for (const guess of progressData.guesses) {
@@ -149,6 +159,11 @@
 						correct: guess.is_correct,
 						userGuess: guess.guess as 'reddit' | 'replicant'
 					});
+
+					// Restore flagged state
+					if (guess.flagged_as_obvious) {
+						flaggedComments.add(guess.comment_id);
+					}
 
 					// Restart text glitching for AI comments that were already guessed
 					const comment = getAllCommentsFlat(postData.comments).find(c => c.id === guess.comment_id);
@@ -159,6 +174,7 @@
 
 				// Trigger reactivity
 				guessedComments = guessedComments;
+				flaggedComments = flaggedComments;
 			}
 
 			progressLoaded = true;
@@ -199,6 +215,8 @@
 			// Clear local state
 			guessedComments.clear();
 			guessedComments = guessedComments;
+			flaggedComments.clear();
+			flaggedComments = flaggedComments;
 			progressLoaded = false; // Allow progress to be reloaded
 			resultsShown = false; // Allow results to show again after reset
 			justMadeGuess = false; // Reset guess flag
@@ -415,6 +433,88 @@
 		}
 	}
 
+	// Constants for post truncation
+	const POST_TRUNCATE_LENGTH = 750; // characters
+
+	function shouldTruncatePost(content: string): boolean {
+		return content && content.length > POST_TRUNCATE_LENGTH;
+	}
+
+	function getTruncatedPost(content: string): string {
+		if (!shouldTruncatePost(content)) return content;
+
+		// Find a good break point near the character limit (end of sentence or paragraph)
+		let truncated = content.substring(0, POST_TRUNCATE_LENGTH);
+
+		// Try to break at end of sentence
+		const lastPeriod = truncated.lastIndexOf('.');
+		const lastQuestion = truncated.lastIndexOf('?');
+		const lastExclamation = truncated.lastIndexOf('!');
+
+		const lastSentenceEnd = Math.max(lastPeriod, lastQuestion, lastExclamation);
+
+		if (lastSentenceEnd > POST_TRUNCATE_LENGTH * 0.7) {
+			truncated = content.substring(0, lastSentenceEnd + 1);
+		}
+
+		return truncated;
+	}
+
+	function flagAsObvious(commentId: string) {
+		feedbackCommentId = commentId;
+
+		// Find the comment content
+		const comment = getAllCommentsFlat(redditData?.comments || []).find(c => c.id === commentId);
+		feedbackCommentContent = comment ? comment.content : '';
+
+		showFeedbackDialog = true;
+		setTimeout(() => feedbackDialogVisible = true, 10);
+	}
+
+	async function submitFeedback() {
+		if (!browser || !currentPostId || !anonymousUserId || !feedbackCommentId) return;
+
+		feedbackSubmitting = true;
+
+		try {
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/users/flag-obvious`, {
+				method: 'POST',
+				headers: databaseManager.getHeaders(),
+				body: JSON.stringify({
+					anonymous_id: anonymousUserId,
+					post_id: currentPostId,
+					comment_id: feedbackCommentId
+				})
+			});
+
+			if (!response.ok) {
+				throw new Error('Failed to flag comment');
+			}
+
+			// Mark this comment as flagged
+			flaggedComments.add(feedbackCommentId);
+			flaggedComments = flaggedComments; // Trigger reactivity
+
+			// Close dialog
+			closeFeedbackDialog();
+		} catch (err) {
+			console.error('Failed to flag comment as obvious:', err);
+			alert('Failed to submit feedback. Please try again.');
+		} finally {
+			feedbackSubmitting = false;
+		}
+	}
+
+	function closeFeedbackDialog() {
+		feedbackDialogVisible = false;
+		setTimeout(() => {
+			showFeedbackDialog = false;
+			feedbackCommentId = '';
+			feedbackCommentContent = '';
+			feedbackSubmitting = false;
+		}, 300);
+	}
+
 	// Calculate total comment count including nested replies
 	$: totalCommentCount = redditData ? redditData.comments.reduce((total, comment) => {
 		return total + getAllComments(comment).length;
@@ -517,7 +617,36 @@
 					</div>
 					<h1 class="text-2xl font-bold mb-4" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">{redditData.post.title}</h1>
 					{#if redditData.post.content}
-						<div class="text-gray-200 mb-4 whitespace-pre-wrap content-text">{redditData.post.content}</div>
+						<div class="text-gray-200 mb-4">
+							<div class="whitespace-pre-wrap content-text">
+								{#if shouldTruncatePost(redditData.post.content) && !postExpanded}
+									{@html getTruncatedPost(redditData.post.content)}
+								{:else}
+									{@html redditData.post.content}
+								{/if}
+							</div>
+							{#if shouldTruncatePost(redditData.post.content)}
+								<div class="mt-2">
+									{#if !postExpanded}
+										<button
+											class="text-sm underline opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+											style="color: #00d4ff;"
+											on:click={() => postExpanded = true}
+										>
+											Read more
+										</button>
+									{:else}
+										<button
+											class="text-sm underline opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+											style="color: #00d4ff;"
+											on:click={() => postExpanded = false}
+										>
+											Show less
+										</button>
+									{/if}
+								</div>
+							{/if}
+						</div>
 					{/if}
 					<div class="text-sm text-gray-400">
 						{redditData.post.score} points • {totalCommentCount} comments
@@ -609,6 +738,22 @@
 												<div class="text-xs ml-2" in:fade={{ duration: 300, delay: 100 }}>
 													{#if guessState.correct}
 														<span style="color: #4ade80;">✓ {flatComment.is_ai ? 'Replicant identified' : 'Reddit origin confirmed'}.</span>
+														{#if flatComment.is_ai}
+															<button
+																class="ml-2 text-xs transition-opacity"
+																class:underline={!flaggedComments.has(flatComment.id)}
+																class:opacity-70={!flaggedComments.has(flatComment.id)}
+																class:hover:opacity-100={!flaggedComments.has(flatComment.id)}
+																class:cursor-pointer={!flaggedComments.has(flatComment.id)}
+																class:opacity-60={flaggedComments.has(flatComment.id)}
+																style="color: #f59e0b;"
+																on:click={() => flagAsObvious(flatComment.id)}
+																title="Flag this AI comment as too obvious to help improve our generation"
+																disabled={flaggedComments.has(flatComment.id)}
+															>
+																{flaggedComments.has(flatComment.id) ? 'Feedback submitted' : 'Too obvious?'}
+															</button>
+														{/if}
 													{:else}
 														<span style="color: #f87171;">✗ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
 													{/if}
@@ -643,6 +788,22 @@
 												<div class="text-xs" in:fade={{ duration: 300, delay: 100 }}>
 													{#if guessState.correct}
 														<span style="color: #4ade80;">✓ {flatComment.is_ai ? 'Replicant identified' : 'Reddit origin confirmed'}.</span>
+														{#if flatComment.is_ai}
+															<button
+																class="ml-2 text-xs transition-opacity"
+																class:underline={!flaggedComments.has(flatComment.id)}
+																class:opacity-70={!flaggedComments.has(flatComment.id)}
+																class:hover:opacity-100={!flaggedComments.has(flatComment.id)}
+																class:cursor-pointer={!flaggedComments.has(flatComment.id)}
+																class:opacity-60={flaggedComments.has(flatComment.id)}
+																style="color: #f59e0b;"
+																on:click={() => flagAsObvious(flatComment.id)}
+																title="Flag this AI comment as too obvious to help improve our generation"
+																disabled={flaggedComments.has(flatComment.id)}
+															>
+																{flaggedComments.has(flatComment.id) ? 'Feedback submitted' : 'Too obvious?'}
+															</button>
+														{/if}
 													{:else}
 														<span style="color: #f87171;">✗ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
 													{/if}
@@ -725,6 +886,74 @@
 					>
 						Next Test
 					</a>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Feedback Dialog -->
+{#if showFeedbackDialog}
+	<div
+		class="fixed inset-0 flex items-center justify-center z-50 transition-opacity duration-300"
+		class:opacity-0={!feedbackDialogVisible}
+		class:opacity-100={feedbackDialogVisible}
+		style="background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px);"
+		on:click={closeFeedbackDialog}
+	>
+		<div
+			class="border border-gray-700 rounded-lg p-8 m-4 max-w-md sm:max-w-2xl w-full transform transition-all duration-300"
+			class:scale-95={!feedbackDialogVisible}
+			class:opacity-0={!feedbackDialogVisible}
+			class:scale-100={feedbackDialogVisible}
+			class:opacity-100={feedbackDialogVisible}
+			style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);"
+			on:click|stopPropagation
+		>
+			<div class="text-center">
+				<h2 class="text-xl font-bold mb-4" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
+					Help Improve Our System
+				</h2>
+
+				<!-- Comment Preview -->
+				{#if feedbackCommentContent}
+					<div class="mb-4 p-3 rounded border border-gray-600 text-left" style="background: rgba(31, 31, 35, 0.6);">
+						<div class="text-xs text-gray-400 mb-2">Comment:</div>
+						<div class="text-gray-200 text-sm max-h-32 overflow-y-auto">
+							{feedbackCommentContent}
+						</div>
+					</div>
+				{/if}
+
+				<p class="text-gray-300 mb-6 leading-relaxed text-left">
+					Was it too obvious that this comment was generated by AI? Your feedback helps us create more realistic content.
+				</p>
+
+				<!-- Action Buttons -->
+				<div class="flex justify-end gap-3">
+					<button
+						on:click={closeFeedbackDialog}
+						class="px-4 py-2 text-white rounded transition-all duration-200 hover:scale-105 cursor-pointer"
+						style="background: #4b5563; border: 1px solid #6b7280;"
+						disabled={feedbackSubmitting}
+					>
+						Cancel
+					</button>
+					<button
+						on:click={submitFeedback}
+						class="px-4 py-2 text-white rounded transition-all duration-200 hover:scale-105 cursor-pointer flex items-center gap-2"
+						style="background: linear-gradient(135deg, #dc2626, #ef4444); border: 1px solid #f87171;"
+						on:mouseenter={(e) => !feedbackSubmitting && (e.target.style.boxShadow = '0 0 15px rgba(248, 113, 113, 0.4)')}
+						on:mouseleave={(e) => e.target.style.boxShadow = ''}
+						disabled={feedbackSubmitting}
+					>
+						{#if feedbackSubmitting}
+							<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+							Submitting...
+						{:else}
+							Too Obvious
+						{/if}
+					</button>
 				</div>
 			</div>
 		</div>

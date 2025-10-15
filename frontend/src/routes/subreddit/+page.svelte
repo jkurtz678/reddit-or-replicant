@@ -4,19 +4,19 @@
 	// Hardcoded subreddits with descriptions
 	const subreddits = [
 		{
+			name: 'news',
+			display: 'r/news',
+			description: 'Breaking news and current events from around the world.'
+		},
+		{
 			name: 'unpopularopinion',
 			display: 'r/unpopularopinion',
 			description: 'Controversial takes and unconventional perspectives that go against the grain.'
 		},
 		{
-			name: 'AmItheAsshole',
-			display: 'r/AmItheAsshole',
-			description: 'Moral dilemmas where users seek judgment on their actions and decisions.'
-		},
-		{
-			name: 'relationship_advice',
-			display: 'r/relationship_advice',
-			description: 'Relationship guidance and support for navigating personal connections.'
+			name: 'changemyview',
+			display: 'r/changemyview',
+			description: 'Substantive discussions where people present arguments to challenge or change perspectives.'
 		}
 	];
 

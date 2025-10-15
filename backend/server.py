@@ -14,7 +14,7 @@ from src.reddit_fetcher import fetch_reddit_post, extract_post_info, validate_re
 from src.database import (
     save_post, get_post_by_id, get_all_posts, get_posts_by_subreddit, post_exists, soft_delete_post, restore_post,
     get_or_create_user, save_user_guess, get_user_progress, get_user_all_progress, reset_user_progress,
-    save_evaluation_result
+    save_evaluation_result, flag_comment_as_obvious
 )
 import anthropic
 from src.gen.generate_mixed_comments import (
@@ -39,6 +39,7 @@ app.add_middleware(
 # Pydantic models for request/response
 class SubmitURLRequest(BaseModel):
     url: str
+    overwrite_existing: bool = False
 
 class AdminLoginRequest(BaseModel):
     password: str
@@ -64,6 +65,11 @@ class UserProgressRequest(BaseModel):
 class ResetProgressRequest(BaseModel):
     anonymous_id: str
     post_id: int
+
+class FlagObviousRequest(BaseModel):
+    anonymous_id: str
+    post_id: int
+    comment_id: str
 
 class PostResponse(BaseModel):
     id: int
@@ -338,6 +344,22 @@ def reset_progress(request: ResetProgressRequest, x_admin_env: str = Header(None
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reset progress: {str(e)}")
 
+@app.post("/api/users/flag-obvious")
+def flag_obvious(request: FlagObviousRequest, x_admin_env: str = Header(None)):
+    """Flag a comment as too obvious for a user"""
+    try:
+        force_turso = parse_admin_environment(x_admin_env)
+        user_id = get_or_create_user(request.anonymous_id, force_turso)
+        success = flag_comment_as_obvious(user_id, request.post_id, request.comment_id, force_turso)
+
+        if success:
+            return {"message": "Comment flagged as obvious successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Guess not found or already flagged")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to flag comment: {str(e)}")
+
 @app.post("/api/posts/submit")
 async def submit_reddit_url(request: SubmitURLRequest, x_admin_env: str = Header(None)):
     """Submit a Reddit URL for processing"""
@@ -349,10 +371,10 @@ async def submit_reddit_url(request: SubmitURLRequest, x_admin_env: str = Header
     # Parse admin environment
     force_turso = parse_admin_environment(x_admin_env)
 
-    # Check if already processed
-    if post_exists(request.url, force_turso=force_turso):
+    # Check if already processed (unless overwrite is enabled)
+    if not request.overwrite_existing and post_exists(request.url, force_turso=force_turso):
         raise HTTPException(status_code=400, detail="This Reddit post has already been processed")
-    
+
     # Check for API key
     api_key = os.getenv('ANTHROPIC_API_KEY')
     if not api_key:
@@ -421,7 +443,8 @@ async def submit_reddit_url(request: SubmitURLRequest, x_admin_env: str = Header
             mixed_comments_data=final_data,
             ai_count=total_ai_final,
             total_count=total_final_comments,
-            force_turso=force_turso
+            force_turso=force_turso,
+            overwrite_existing=request.overwrite_existing
         )
 
         # Run LLM-as-a-judge evaluation

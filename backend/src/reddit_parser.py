@@ -26,6 +26,8 @@ class Comment:
     parent_id: Optional[str]
     replies: List['Comment']
     is_ai: bool = False
+    generation_prompt: Optional[str] = None
+    archetype_used: Optional[str] = None
 
 
 def clean_html_content(html_content: str) -> str:
@@ -73,10 +75,18 @@ def parse_comment(comment_data: Dict[str, Any], depth: int = 0, parent_id: Optio
 
 def parse_post(post_data: Dict[str, Any]) -> Post:
     """Parse a Reddit post into our clean format"""
+    # For link posts, include the URL when selftext is empty
+    content = post_data.get('selftext', '')
+    if not content and not post_data.get('is_self', True):
+        # This is a link post with no selftext, include the URL as clickable link
+        url = post_data.get('url', '')
+        if url:
+            content = f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">{url}</a>'
+
     return Post(
         id=post_data['id'],
         title=post_data.get('title', ''),
-        content=post_data.get('selftext', ''),
+        content=content,
         author=post_data.get('author', '[deleted]'),
         subreddit=post_data.get('subreddit', ''),
         score=post_data.get('score', 0),
