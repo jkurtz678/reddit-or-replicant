@@ -427,59 +427,104 @@ def get_thread_context(comment: Comment, all_comments_flat: List[Comment]) -> Li
 
 def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
                          thread_context: List[Comment], parent_comment: Comment,
-                         anthropic_client: anthropic.Anthropic) -> Comment:
-    """Generate a single AI reply to a specific comment with full thread context"""
+                         anthropic_client: anthropic.Anthropic,
+                         all_real_comments: List[Comment] = None,
+                         previously_generated: List[Comment] = None) -> Comment:
+    """Generate a single AI reply to a specific comment using hybrid archetypes and realistic length"""
     
-    # Build thread context string
-    context_str = ""
-    if thread_context:
-        context_str = "THREAD CONTEXT (conversation so far):\n"
-        for i, ctx_comment in enumerate(thread_context):
-            context_str += f"{i+1}. u/{ctx_comment.author}: {ctx_comment.content[:200]}{'...' if len(ctx_comment.content) > 200 else ''}\n"
-        context_str += "\n"
+    # Hybrid archetype selection: 70% generic, 30% subreddit-specific
+    generic_archetypes = [
+        'generic:casual_reactor',
+        'generic:simple_agreement',
+        'generic:question_asker',
+        'generic:one_liner_comedian'
+    ]
+
+    # Get subreddit-specific archetypes (shorter/reactive ones only)
+    subreddit_archetypes = []
+    available_archetypes = get_available_archetypes(subreddit)
+    for arch in available_archetypes:
+        if not arch.startswith('generic:'):
+            subreddit_archetypes.append(arch)
+
+    # 70% generic, 30% subreddit-specific selection
+    if random.random() < 0.7 or not subreddit_archetypes:
+        selected_archetype = random.choice(generic_archetypes)
+    else:
+        selected_archetype = random.choice(subreddit_archetypes)
+
+    # Simple length analysis of real replies
+    real_reply_lengths = []
+    if all_real_comments:
+        for comment in flatten_all_comments(all_real_comments):
+            if comment.depth > 0:  # Only replies, not top-level
+                real_reply_lengths.append(len(comment.content.split()))
+
+    # Simple target: pick from the shorter half of real replies
+    if real_reply_lengths:
+        real_reply_lengths.sort()
+        # Pick from bottom 60% of lengths to bias toward shorter
+        cutoff = int(len(real_reply_lengths) * 0.6)
+        short_lengths = real_reply_lengths[:cutoff] if cutoff > 0 else real_reply_lengths
+        target_length = random.choice(short_lengths) if short_lengths else 8
+    else:
+        target_length = random.choice([3, 5, 7, 10, 12])  # Fallback
+
+    # Cap at reasonable maximum
+    target_length = min(target_length, 20)
     
-    prompt = f"""You are generating a realistic Reddit reply for r/{subreddit}.
+    # Build simple context
+    examples = f"Parent comment: u/{parent_comment.author} ({len(parent_comment.content.split())} words): {parent_comment.content[:100]}{'...' if len(parent_comment.content) > 100 else ''}"
 
-POST TITLE: {post_title}
+    # Add repetition prevention
+    avoid_repetition_text = ""
+    if previously_generated:
+        avoid_repetition_text = "\n\nPREVIOUSLY GENERATED AI REPLIES (avoid similar patterns):\n"
+        for i, prev_comment in enumerate(previously_generated[-5:]):
+            opening = prev_comment.content.split('.')[0] if '.' in prev_comment.content else prev_comment.content[:30]
+            avoid_repetition_text += f"- {opening}...\n"
+        avoid_repetition_text += "\nUse completely different style/opening.\n"
 
-POST CONTENT: {post_content}
+    # Build context for the reply
+    context_str = f"\nREPLYING TO: u/{parent_comment.author}: {parent_comment.content[:150]}{'...' if len(parent_comment.content) > 150 else ''}"
 
-{context_str}COMMENT YOU'RE REPLYING TO:
-u/{parent_comment.author}: {parent_comment.content}
+    # Use archetype system
+    base_prompt = build_full_prompt(
+        archetype_key=selected_archetype,
+        subreddit=subreddit,
+        post_title=post_title,
+        post_content=post_content,
+        real_comment_examples=examples
+    )
 
-Generate 1 realistic Reddit reply to this comment. The reply should:
+    length_guidance = f"""
+CRITICAL LENGTH REQUIREMENT:
+- Your response MUST be {target_length} words or fewer
+- Real replies here average {sum(real_reply_lengths)/len(real_reply_lengths) if real_reply_lengths else 0:.0f} words
+- TARGET: {target_length} words maximum
+- Most Reddit replies are brief reactions, not explanations"""
 
-1. Be contextually relevant to the immediate parent comment
-2. Consider the broader thread context if provided
-3. Sound natural and human-written
-4. Use a generic, unrelated username (NOT topic-related)
-5. Vary in style (could be short reaction, longer response, question, anecdote, etc.)
+    prompt = f"""{base_prompt}{context_str}{avoid_repetition_text}{length_guidance}
 
-CRITICAL REPLY FORMATTING:
-- NEVER start with "u/username:" - real Reddit replies don't do this
-- Jump straight into your response without addressing the username
-- Real examples: "Yeah, exactly this." NOT "u/someone: Yeah, exactly this."
-- If you need to reference them, use "you" or just reply directly
-
-CRITICAL: Make this indistinguishable from a real human reply. Don't try too hard to sound "Reddit-y".
-
-Format as JSON:
-{{"content": "reply text"}}
-"""
+CRITICAL REPLY REQUIREMENTS:
+- This is a REPLY to a specific comment, not a top-level comment
+- Be contextually relevant to what you're replying to
+- Sound like a quick human reaction, not an analysis
+- NEVER start with "u/username:" - jump straight into response
+- Don't over-explain - just react naturally"""
     
     try:
         response = anthropic_client.messages.create(
             model="claude-3-5-sonnet-20241022",
-            max_tokens=800,
-            temperature=0.8,
+            max_tokens=400,  # Reduced for shorter replies
+            temperature=0.9,  # Higher for more natural variation
             messages=[{
                 "role": "user",
                 "content": prompt
             }]
         )
         
-        response_text = response.content[0].text
-        # print(f"Generated thread reply: {response_text[:200]}...")
+        response_text = response.content[0].text.strip()
         
         # Parse JSON
         start_idx = response_text.find('{')
@@ -498,19 +543,29 @@ Format as JSON:
         
         if 'content' not in reply_data:
             raise ValueError("Missing required fields in response")
+
+        # Validate length - reject if too long
+        word_count = len(reply_data['content'].split())
+        if word_count > target_length + 3:  # Small tolerance
+            print(f"Reply too long ({word_count} words, target {target_length}), regenerating...")
+            return None
         
         # Create reply with appropriate depth
         reply = Comment(
             id=str(uuid.uuid4()),
-            author=generate_reddit_username(),  # Use Faker for username
+            author=generate_reddit_username(),
             content=reply_data['content'],
             content_html=None,
             score=random.randint(1, max(50, parent_comment.score)),
             depth=parent_comment.depth + 1,
             parent_id=parent_comment.id,
             replies=[],
-            is_ai=True
+            is_ai=True,
+            generation_prompt=prompt,
+            archetype_used=selected_archetype
         )
+
+        print(f"Generated {selected_archetype} reply ({word_count} words): {reply.content[:50]}...")
         
         return reply
         
@@ -667,7 +722,9 @@ def main():
             post.subreddit,
             thread_context,
             parent_comment,
-            client
+            client,
+            all_real_comments=real_comments,
+            previously_generated=[reply[0] for reply in ai_replies]  # Pass previous AI replies
         )
         
         if ai_reply:

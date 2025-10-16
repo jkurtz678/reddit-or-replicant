@@ -11,12 +11,12 @@
 		{
 			name: 'unpopularopinion',
 			display: 'r/unpopularopinion',
-			description: 'Controversial takes and unconventional perspectives that go against the grain.'
+			description: 'Controversial takes and unconventional perspectives.'
 		},
 		{
 			name: 'changemyview',
 			display: 'r/changemyview',
-			description: 'Substantive discussions where people present arguments to challenge or change perspectives.'
+			description: 'Discussions aimed at changing people\'s minds.'
 		}
 	];
 

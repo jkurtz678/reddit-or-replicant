@@ -148,11 +148,52 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
     Returns:
         List of selected Comment objects with their reply structures intact
     """
+    print(f"DEBUG: select_representative_comments called with {len(comments)} comments")
+
+    # Debug: Print first few comments to see their content
+    for i, comment in enumerate(comments[:3]):
+        print(f"DEBUG: Comment {i}: '{comment.content[:50]}...' (depth: {comment.depth})")
+
+    # Filter out deleted/removed comments first (always do this)
+    def is_valid_comment(comment):
+        """Check if comment has valid content (not deleted/removed)"""
+        content = comment.content.strip().lower()
+        is_valid = content not in ['[deleted]', '[removed]', '', 'deleted', 'removed']
+        print(f"DEBUG: Checking comment '{content}' -> is_valid: {is_valid}")
+        if not is_valid:
+            print(f"DEBUG: Filtering out deleted comment: '{comment.content}'")
+        return is_valid
+
+    def filter_comments_recursive(comment_list):
+        """Recursively filter out deleted comments"""
+        filtered = []
+        for comment in comment_list:
+            if is_valid_comment(comment):
+                # Create copy with filtered replies
+                filtered_comment = Comment(
+                    id=comment.id,
+                    author=comment.author,
+                    content=comment.content,
+                    content_html=comment.content_html,
+                    score=comment.score,
+                    depth=comment.depth,
+                    parent_id=comment.parent_id,
+                    replies=filter_comments_recursive(comment.replies),
+                    is_ai=comment.is_ai
+                )
+                filtered.append(filtered_comment)
+        return filtered
+
+    # Always filter out deleted comments first
+    comments = filter_comments_recursive(comments)
+    print(f"DEBUG: After filtering, have {len(comments)} valid comments")
+
     if len(comments) <= max_comments:
-        return comments.copy()
+        print(f"EXIT EARLY BECAUSE NOT ENOUGH COMMENTS AFTER FILTERING")
+        return comments
     
-    # Separate top-level comments and sort by score
-    top_level_comments = [c for c in comments if c.depth == 0]
+    # Separate top-level comments, filter valid ones, and sort by score
+    top_level_comments = [c for c in comments if c.depth == 0 and is_valid_comment(c)]
     top_level_comments.sort(key=lambda x: x.score, reverse=True)
     
     selected_comments = []
@@ -182,9 +223,10 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
         selected_comments.append(selected_comment)
         total_count += 1
         
-        # Add the best reply if we have space and this comment has replies
-        if comment.replies and total_count < max_comments:
-            best_reply = max(comment.replies, key=lambda x: x.score)
+        # Add the best reply if we have space and this comment has valid replies
+        valid_replies = [r for r in comment.replies if is_valid_comment(r)]
+        if valid_replies and total_count < max_comments:
+            best_reply = max(valid_replies, key=lambda x: x.score)
             # Create a copy without sub-replies to keep it simple
             reply_copy = Comment(
                 id=best_reply.id,
@@ -227,9 +269,10 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
             selected_comments.append(selected_comment)
             total_count += 1
             
-            # Add one reply if we have space and this comment has replies
-            if comment.replies and total_count < max_comments:
-                best_reply = max(comment.replies, key=lambda x: x.score)
+            # Add one reply if we have space and this comment has valid replies
+            valid_replies = [r for r in comment.replies if is_valid_comment(r)]
+            if valid_replies and total_count < max_comments:
+                best_reply = max(valid_replies, key=lambda x: x.score)
                 reply_copy = Comment(
                     id=best_reply.id,
                     author=best_reply.author,

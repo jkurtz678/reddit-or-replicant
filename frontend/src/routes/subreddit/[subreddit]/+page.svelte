@@ -7,6 +7,16 @@
 	import { databaseManager, isLocalEnvironment } from '$lib/environment';
 	import DatabaseSelector from '$lib/components/DatabaseSelector.svelte';
 
+	// Close dropdown when clicking outside
+	function handleClickOutside(event: MouseEvent) {
+		if (openDropdownId !== null) {
+			const target = event.target as HTMLElement;
+			if (!target.closest('.relative')) {
+				closeDropdown();
+			}
+		}
+	}
+
 	interface PostListItem {
 		id: number;
 		reddit_url: string;
@@ -37,6 +47,7 @@
 	let anonymousUserId = '';
 	let progressLoaded = false;
 	let currentSubreddit = '';
+	let openDropdownId: number | null = null;
 
 	// Get subreddit from URL params
 	$: currentSubreddit = $page.params.subreddit || '';
@@ -73,6 +84,14 @@
 		// Only load if we have the subreddit - the reactive statement will handle the rest
 		if (currentSubreddit && browser && anonymousUserId) {
 			await loadAllData();
+		}
+
+		// Add click outside handler
+		if (browser) {
+			document.addEventListener('click', handleClickOutside);
+			return () => {
+				document.removeEventListener('click', handleClickOutside);
+			};
 		}
 	});
 
@@ -245,6 +264,48 @@
 		}
 	}
 
+	async function reprocessPost(post: PostListItem) {
+		if (!confirm('Reprocess this post? This will regenerate the AI comments.')) {
+			return;
+		}
+
+		submitting = true;
+		try {
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/posts/submit`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					...databaseManager.getHeaders()
+				},
+				body: JSON.stringify({
+					url: post.reddit_url,
+					overwrite_existing: true
+				})
+			});
+
+			if (response.ok) {
+				await loadAllData(); // Refresh the list
+				closeDropdown();
+			} else {
+				const errorData = await response.json();
+				alert('Failed to reprocess post: ' + errorData.detail);
+			}
+		} catch (err) {
+			console.error('Reprocess failed:', err);
+			alert('Failed to reprocess post. Please try again.');
+		} finally {
+			submitting = false;
+		}
+	}
+
+	function toggleDropdown(postId: number) {
+		openDropdownId = openDropdownId === postId ? null : postId;
+	}
+
+	function closeDropdown() {
+		openDropdownId = null;
+	}
+
 	// Get display name for subreddit
 	function getSubredditDisplayName(subreddit: string): string {
 		const displayMap: Record<string, string> = {
@@ -403,15 +464,35 @@
 												{/if}
 											</button>
 											{#if showAdminFeatures}
-												<button
-													on:click|stopPropagation={() => deletePost(post.id)}
-													class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
-													style="background: linear-gradient(135deg, #7f1d1d, #dc2626); border: 1px solid rgba(220, 38, 38, 0.3);"
-													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(220, 38, 38, 0.4)'}
-													on:mouseleave={(e) => e.target.style.boxShadow = ''}
-												>
-													Delete
-												</button>
+												<div class="relative">
+													<button
+														on:click|stopPropagation={() => toggleDropdown(post.id)}
+														class="px-2 py-1 text-gray-400 hover:text-white rounded text-sm transition-all duration-200 hover:bg-gray-700"
+														title="Post options"
+													>
+														⋮
+													</button>
+													{#if openDropdownId === post.id}
+														<div
+															class="absolute right-0 top-8 z-10 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-1 min-w-[120px]"
+															on:click|stopPropagation={() => {}}
+														>
+															<button
+																on:click|stopPropagation={() => reprocessPost(post)}
+																class="w-full px-3 py-2 text-left text-white hover:bg-gray-700 transition-colors text-sm"
+																disabled={submitting}
+															>
+																{submitting ? 'Processing...' : 'Reprocess'}
+															</button>
+															<button
+																on:click|stopPropagation={() => { deletePost(post.id); closeDropdown(); }}
+																class="w-full px-3 py-2 text-left text-red-400 hover:bg-gray-700 transition-colors text-sm"
+															>
+																Delete
+															</button>
+														</div>
+													{/if}
+												</div>
 											{/if}
 										{:else if showAdminFeatures}
 											<button
@@ -485,15 +566,35 @@
 												{/if}
 											</button>
 											{#if showAdminFeatures}
-												<button
-													on:click|stopPropagation={() => deletePost(post.id)}
-													class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
-													style="background: linear-gradient(135deg, #7f1d1d, #dc2626); border: 1px solid rgba(220, 38, 38, 0.3);"
-													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(220, 38, 38, 0.4)'}
-													on:mouseleave={(e) => e.target.style.boxShadow = ''}
-												>
-													Delete
-												</button>
+												<div class="relative">
+													<button
+														on:click|stopPropagation={() => toggleDropdown(post.id)}
+														class="px-2 py-1 text-gray-400 hover:text-white rounded text-sm transition-all duration-200 hover:bg-gray-700"
+														title="Post options"
+													>
+														⋮
+													</button>
+													{#if openDropdownId === post.id}
+														<div
+															class="absolute right-0 top-8 z-10 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-1 min-w-[120px]"
+															on:click|stopPropagation={() => {}}
+														>
+															<button
+																on:click|stopPropagation={() => reprocessPost(post)}
+																class="w-full px-3 py-2 text-left text-white hover:bg-gray-700 transition-colors text-sm"
+																disabled={submitting}
+															>
+																{submitting ? 'Processing...' : 'Reprocess'}
+															</button>
+															<button
+																on:click|stopPropagation={() => { deletePost(post.id); closeDropdown(); }}
+																class="w-full px-3 py-2 text-left text-red-400 hover:bg-gray-700 transition-colors text-sm"
+															>
+																Delete
+															</button>
+														</div>
+													{/if}
+												</div>
 											{/if}
 										{:else if showAdminFeatures}
 											<button
