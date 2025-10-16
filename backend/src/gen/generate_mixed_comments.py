@@ -189,12 +189,13 @@ def generate_single_ai_comment(post_title: str, post_content: str, subreddit: st
 
     # Add previously generated comments to avoid repetition
     avoid_repetition_text = ""
-    if previously_generated:
-        avoid_repetition_text = "\n\nPREVIOUSLY GENERATED AI COMMENTS (DO NOT REPEAT THESE PATTERNS):\n"
-        for i, prev_comment in enumerate(previously_generated[-7:]):  # Show up to 7 previous comments to catch patterns
-            opening = prev_comment.content.split('.')[0] if '.' in prev_comment.content else prev_comment.content[:50]
-            avoid_repetition_text += f"- AI Comment {i+1} opening: \"{opening}...\"\n"
-        avoid_repetition_text += "\nIMPORTANT: Avoid starting with similar phrases, structures, or personal anecdotes as the AI comments above.\n"
+    # COMMENTED OUT: Previously generated AI comments section - testing if it's necessary with different archetypes
+    # if previously_generated:
+    #     avoid_repetition_text = "\n\nPREVIOUSLY GENERATED AI COMMENTS (DO NOT REPEAT THESE PATTERNS):\n"
+    #     for i, prev_comment in enumerate(previously_generated[-7:]):  # Show up to 7 previous comments to catch patterns
+    #         opening = prev_comment.content.split('.')[0] if '.' in prev_comment.content else prev_comment.content[:50]
+    #         avoid_repetition_text += f"- AI Comment {i+1} opening: \"{opening}...\"\n"
+    #     avoid_repetition_text += "\nIMPORTANT: Avoid starting with similar phrases, structures, or personal anecdotes as the AI comments above.\n"
 
     # Get length statistics from real comments for guidance
     real_word_counts = [len(comment.content.split()) for comment in flatten_all_comments(real_comments)]
@@ -213,12 +214,10 @@ def generate_single_ai_comment(post_title: str, post_content: str, subreddit: st
         target_length = min(max_length, 50)  # Cap at 50 words max
 
     length_guidance = f"""
-CRITICAL LENGTH REQUIREMENT:
-- Your response MUST be {target_length} words or fewer
-- Real comments here: {min_length}-{max_length} words (avg: {avg_length:.0f})
-- TARGET FOR THIS COMMENT: {target_length} words maximum
-- Count your words carefully - responses over {target_length} words will be rejected
-- Most Reddit comments are brief and to the point, not explanatory essays"""
+LENGTH REQUIREMENT:
+- Target: {target_length} words maximum (real comments here: {min_length}-{max_length} words, avg: {avg_length:.0f})
+- This is important for realistic Reddit comment length - most are very brief
+- Write concisely and get to your point quickly"""
 
     # Build the full prompt using the archetype system with our enhancements
     base_prompt = build_full_prompt(
@@ -234,9 +233,7 @@ CRITICAL LENGTH REQUIREMENT:
 
 CRITICAL REMINDERS:
 - Be unique and unexpected - avoid cliché openings like "I used to work at..." or "My [relative] said..."
-- Vary your comment length to match real Reddit patterns
-- Don't repeat patterns from previously generated AI comments
-- Sound natural and human, not like you're trying to be comprehensive or helpful"""
+- Don't be comprehensive or helpful - just react naturally like a real person would"""
     
     try:
         response = anthropic_client.messages.create(
@@ -276,7 +273,14 @@ CRITICAL REMINDERS:
         if not isinstance(comment_data, dict) or 'content' not in comment_data:
             print(f"Malformed comment data: {comment_data}")
             return None
-        
+
+        # Validate length with reasonable tolerance
+        word_count = len(comment_data['content'].split())
+        tolerance = max(3, int(target_length * 0.25))  # 25% tolerance, minimum 3 words
+        if word_count > target_length + tolerance:
+            print(f"Comment too long ({word_count} words, target {target_length} + {tolerance} tolerance), skipping...")
+            return None
+
         # Generate realistic score
         min_score, max_score = get_score_range(real_comments)
         
@@ -431,8 +435,8 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
                          all_real_comments: List[Comment] = None,
                          previously_generated: List[Comment] = None) -> Comment:
     """Generate a single AI reply to a specific comment using hybrid archetypes and realistic length"""
-    
-    # Hybrid archetype selection: 70% generic, 30% subreddit-specific
+
+    # Hybrid archetype selection: 50% generic, 50% subreddit-specific for better subreddit flavor
     generic_archetypes = [
         'generic:casual_reactor',
         'generic:simple_agreement',
@@ -440,15 +444,15 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
         'generic:one_liner_comedian'
     ]
 
-    # Get subreddit-specific archetypes (shorter/reactive ones only)
+    # Get subreddit-specific archetypes - all are suitable for replies with length constraints
     subreddit_archetypes = []
     available_archetypes = get_available_archetypes(subreddit)
     for arch in available_archetypes:
         if not arch.startswith('generic:'):
             subreddit_archetypes.append(arch)
 
-    # 70% generic, 30% subreddit-specific selection
-    if random.random() < 0.7 or not subreddit_archetypes:
+    # 50% generic, 50% subreddit-specific selection for better subreddit character
+    if random.random() < 0.5 or not subreddit_archetypes:
         selected_archetype = random.choice(generic_archetypes)
     else:
         selected_archetype = random.choice(subreddit_archetypes)
@@ -456,34 +460,48 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
     # Simple length analysis of real replies
     real_reply_lengths = []
     if all_real_comments:
-        for comment in flatten_all_comments(all_real_comments):
+        all_flat = flatten_all_comments(all_real_comments)
+        for comment in all_flat:
             if comment.depth > 0:  # Only replies, not top-level
                 real_reply_lengths.append(len(comment.content.split()))
 
-    # Simple target: pick from the shorter half of real replies
+        print(f"DEBUG: Found {len(all_flat)} total comments, {len(real_reply_lengths)} replies for length analysis")
+
+    # More natural target length selection with better variability
     if real_reply_lengths:
         real_reply_lengths.sort()
-        # Pick from bottom 60% of lengths to bias toward shorter
-        cutoff = int(len(real_reply_lengths) * 0.6)
-        short_lengths = real_reply_lengths[:cutoff] if cutoff > 0 else real_reply_lengths
-        target_length = random.choice(short_lengths) if short_lengths else 8
-    else:
-        target_length = random.choice([3, 5, 7, 10, 12])  # Fallback
 
-    # Cap at reasonable maximum
-    target_length = min(target_length, 20)
+        # Use a more natural distribution instead of just the shortest 60%
+        rand_val = random.random()
+        if rand_val < 0.5:  # 50% chance: pick from shorter half
+            cutoff = len(real_reply_lengths) // 2
+            target_length = random.choice(real_reply_lengths[:cutoff]) if cutoff > 0 else random.choice(real_reply_lengths)
+        elif rand_val < 0.8:  # 30% chance: pick from middle range
+            start = len(real_reply_lengths) // 4
+            end = (len(real_reply_lengths) * 3) // 4
+            target_length = random.choice(real_reply_lengths[start:end]) if end > start else random.choice(real_reply_lengths)
+        else:  # 20% chance: pick from longer replies
+            start = len(real_reply_lengths) // 2
+            target_length = random.choice(real_reply_lengths[start:]) if start < len(real_reply_lengths) else random.choice(real_reply_lengths)
+    else:
+        print("DEBUG: No real replies found, using fallback target length")
+        target_length = random.choice([7, 10, 12, 15, 18, 25])  # Expanded fallback range
+
+    # More generous cap to allow natural variation
+    target_length = min(target_length, 40)
     
     # Build simple context
     examples = f"Parent comment: u/{parent_comment.author} ({len(parent_comment.content.split())} words): {parent_comment.content[:100]}{'...' if len(parent_comment.content) > 100 else ''}"
 
     # Add repetition prevention
     avoid_repetition_text = ""
-    if previously_generated:
-        avoid_repetition_text = "\n\nPREVIOUSLY GENERATED AI REPLIES (avoid similar patterns):\n"
-        for i, prev_comment in enumerate(previously_generated[-5:]):
-            opening = prev_comment.content.split('.')[0] if '.' in prev_comment.content else prev_comment.content[:30]
-            avoid_repetition_text += f"- {opening}...\n"
-        avoid_repetition_text += "\nUse completely different style/opening.\n"
+    # COMMENTED OUT: Previously generated AI replies section - testing if it's necessary with different archetypes
+    # if previously_generated:
+    #     avoid_repetition_text = "\n\nPREVIOUSLY GENERATED AI REPLIES (avoid similar patterns):\n"
+    #     for i, prev_comment in enumerate(previously_generated[-5:]):
+    #         opening = prev_comment.content.split('.')[0] if '.' in prev_comment.content else prev_comment.content[:30]
+    #         avoid_repetition_text += f"- {opening}...\n"
+    #     avoid_repetition_text += "\nUse completely different style/opening.\n"
 
     # Build context for the reply
     context_str = f"\nREPLYING TO: u/{parent_comment.author}: {parent_comment.content[:150]}{'...' if len(parent_comment.content) > 150 else ''}"
@@ -497,12 +515,14 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
         real_comment_examples=examples
     )
 
+    # Calculate average for prompt display
+    avg_reply_length = sum(real_reply_lengths) / len(real_reply_lengths) if real_reply_lengths else None
+    avg_text = f"average {avg_reply_length:.0f} words" if avg_reply_length else "no replies found - using fallback"
+
     length_guidance = f"""
-CRITICAL LENGTH REQUIREMENT:
-- Your response MUST be {target_length} words or fewer
-- Real replies here average {sum(real_reply_lengths)/len(real_reply_lengths) if real_reply_lengths else 0:.0f} words
-- TARGET: {target_length} words maximum
-- Most Reddit replies are brief reactions, not explanations"""
+LENGTH REQUIREMENT:
+- Target: {target_length} words maximum (real replies here {avg_text})
+- This is important - Reddit replies are typically very short reactions, not explanations"""
 
     prompt = f"""{base_prompt}{context_str}{avoid_repetition_text}{length_guidance}
 
@@ -544,10 +564,11 @@ CRITICAL REPLY REQUIREMENTS:
         if 'content' not in reply_data:
             raise ValueError("Missing required fields in response")
 
-        # Validate length - reject if too long
+        # Validate length with generous tolerance for natural variation
         word_count = len(reply_data['content'].split())
-        if word_count > target_length + 3:  # Small tolerance
-            print(f"Reply too long ({word_count} words, target {target_length}), regenerating...")
+        tolerance = max(5, int(target_length * 0.5))  # 50% tolerance, minimum 5 words
+        if word_count > target_length + tolerance:
+            print(f"Reply too long ({word_count} words, target {target_length} + {tolerance} tolerance), skipping...")
             return None
         
         # Create reply with appropriate depth
@@ -715,7 +736,7 @@ def main():
         
         # Get full thread context (using all available comments)
         thread_context = get_thread_context(parent_comment, all_comments_flat)
-        
+
         ai_reply = generate_thread_reply(
             post.title,
             post.content,

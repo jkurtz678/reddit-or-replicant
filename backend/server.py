@@ -92,7 +92,7 @@ def parse_admin_environment(x_admin_env: str = None) -> bool:
 
 def comment_to_dict(comment) -> dict:
     """Convert Comment object to dictionary for JSON serialization"""
-    return {
+    result = {
         'id': comment.id,
         'author': comment.author,
         'content': comment.content,
@@ -103,6 +103,14 @@ def comment_to_dict(comment) -> dict:
         'replies': [comment_to_dict(reply) for reply in comment.replies],
         'is_ai': comment.is_ai
     }
+
+    # Add AI generation fields if they exist
+    if hasattr(comment, 'generation_prompt') and comment.generation_prompt is not None:
+        result['generation_prompt'] = comment.generation_prompt
+    if hasattr(comment, 'archetype_used') and comment.archetype_used is not None:
+        result['archetype_used'] = comment.archetype_used
+
+    return result
 
 async def generate_mixed_comments_for_post(post, real_comments, client):
     """Generate mixed AI and real comments for a post"""
@@ -165,7 +173,8 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
             post.subreddit,
             thread_context,
             parent_comment,
-            client
+            client,
+            all_real_comments=limited_real_comments
         )
         
         if ai_reply:

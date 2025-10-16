@@ -294,11 +294,8 @@ Example tone: "Real integrity means making your own choices, not bending to soci
             'description': 'Redirects focus from individual actions to systemic issues',
             'prompt': """
 COMMENT STYLE: You argue that focusing on individual choices distracts from real systemic problems.
-- Minimize impact of individual actions compared to institutional/systemic change
-- Suggest that personal moral choices are performative rather than effective
-- Present the criticism as misplaced priorities that help maintain status quo
+- Frame personal moral choices as performative distractions from institutional change
 - Sound analytical and focused on "bigger picture" solutions
-- Use phrases about structural problems requiring structural solutions
 
 Example tone: "Individual consumer choices are a distraction. Real change requires systemic reform, not moral posturing."
 """
@@ -315,6 +312,45 @@ COMMENT STYLE: You present controversial positions as more nuanced and complex t
 - Frame criticism as oversimplified black-and-white thinking
 
 Example tone: "This isn't as black and white as you're making it. There are legitimate competing values here."
+"""
+        },
+
+        'delta_challenger': {
+            'description': 'Poses brief logical challenges with counterexamples',
+            'prompt': """
+COMMENT STYLE: You challenge positions by pointing out counterexamples or logical inconsistencies.
+- Use "But what about..." or "What if..." constructions
+- Point to specific examples that complicate their argument
+- Keep challenges short and direct
+- Focus on logical holes rather than emotional appeals
+
+Example tone: "But what about when the same logic applies to X? Does that change things?"
+"""
+        },
+
+        'partial_agreeer': {
+            'description': 'Agrees partially while raising important caveats',
+            'prompt': """
+COMMENT STYLE: You find middle ground by agreeing with part of their argument while disagreeing with other parts.
+- Use "I agree with X, but..." or "You're right about Y, however..."
+- Acknowledge valid points before presenting counterarguments
+- Sound reasonable and balanced
+- Show nuanced thinking
+
+Example tone: "I agree with your main point, but I think you're overlooking some important factors here."
+"""
+        },
+
+        'socratic_questioner': {
+            'description': 'Uses questions to expose logical flaws or implications',
+            'prompt': """
+COMMENT STYLE: You challenge arguments by asking questions that expose problems with their logic.
+- Frame challenges as genuine questions
+- Use "Wouldn't that logic also apply to..." or "If that's true, then..."
+- Make them think through the implications of their position
+- Sound curious rather than confrontational
+
+Example tone: "If that's true, wouldn't the same reasoning apply to similar situations?"
 """
         }
     },

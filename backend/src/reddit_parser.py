@@ -150,19 +150,19 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
     """
     print(f"DEBUG: select_representative_comments called with {len(comments)} comments")
 
-    # Debug: Print first few comments to see their content
-    for i, comment in enumerate(comments[:3]):
-        print(f"DEBUG: Comment {i}: '{comment.content[:50]}...' (depth: {comment.depth})")
-
     # Filter out deleted/removed comments first (always do this)
     def is_valid_comment(comment):
-        """Check if comment has valid content (not deleted/removed)"""
+        """Check if comment has valid content (not deleted/removed) and reasonable length"""
         content = comment.content.strip().lower()
-        is_valid = content not in ['[deleted]', '[removed]', '', 'deleted', 'removed']
-        print(f"DEBUG: Checking comment '{content}' -> is_valid: {is_valid}")
-        if not is_valid:
-            print(f"DEBUG: Filtering out deleted comment: '{comment.content}'")
-        return is_valid
+        if content in ['[deleted]', '[removed]', '', 'deleted', 'removed']:
+            return False
+
+        # Check word count - reject if over 180 words
+        word_count = len(comment.content.split())
+        if word_count > 180:
+            return False
+
+        return True
 
     def filter_comments_recursive(comment_list):
         """Recursively filter out deleted comments"""

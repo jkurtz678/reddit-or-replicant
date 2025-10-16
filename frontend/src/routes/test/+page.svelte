@@ -4,7 +4,7 @@
 	import { fade } from 'svelte/transition';
 	import { userManager } from '$lib/user';
 	import { browser } from '$app/environment';
-	import { databaseManager } from '$lib/environment';
+	import { databaseManager, isLocalEnvironment } from '$lib/environment';
 
 	// Glitch character pool - only ASCII characters that are truly monospace
 	const glitchChars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|\\;:,.<>?/~`';
@@ -33,6 +33,8 @@
 		parent_id: string | null;
 		replies: Comment[];
 		is_ai: boolean;
+		generation_prompt?: string;
+		archetype_used?: string;
 	}
 
 	interface RedditData {
@@ -58,6 +60,8 @@
 	let feedbackSubmitting = false;
 	let flaggedComments = new Set();
 	let postExpanded = false;
+	let showPromptDialog = false;
+	let promptDialogComment: Comment | null = null;
 
 	// Initialize user ID when in browser
 	$: if (browser && !anonymousUserId) {
@@ -515,6 +519,16 @@
 		}, 300);
 	}
 
+	function showPrompt(comment: Comment) {
+		promptDialogComment = comment;
+		showPromptDialog = true;
+	}
+
+	function closePromptDialog() {
+		showPromptDialog = false;
+		promptDialogComment = null;
+	}
+
 	// Calculate total comment count including nested replies
 	$: totalCommentCount = redditData ? redditData.comments.reduce((total, comment) => {
 		return total + getAllComments(comment).length;
@@ -757,6 +771,16 @@
 													{:else}
 														<span style="color: #f87171;">✗ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
 													{/if}
+													{#if flatComment.is_ai && isLocalEnvironment && (flatComment.generation_prompt || flatComment.archetype_used)}
+														<button
+															class="ml-2 text-xs underline opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+															style="color: #a78bfa;"
+															on:click={() => showPrompt(flatComment)}
+															title="View the archetype and prompt used to generate this comment"
+														>
+															Show Prompt
+														</button>
+													{/if}
 												</div>
 											</div>
 
@@ -806,6 +830,16 @@
 														{/if}
 													{:else}
 														<span style="color: #f87171;">✗ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
+													{/if}
+													{#if flatComment.is_ai && isLocalEnvironment && (flatComment.generation_prompt || flatComment.archetype_used)}
+														<button
+															class="ml-2 text-xs underline opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+															style="color: #a78bfa;"
+															on:click={() => showPrompt(flatComment)}
+															title="View the archetype and prompt used to generate this comment"
+														>
+															Show Prompt
+														</button>
 													{/if}
 												</div>
 											</div>
@@ -955,6 +989,89 @@
 						{/if}
 					</button>
 				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Show Prompt Dialog -->
+{#if showPromptDialog && promptDialogComment}
+	<div
+		class="fixed inset-0 flex items-center justify-center z-50 transition-opacity duration-300"
+		style="background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px);"
+		on:click={closePromptDialog}
+	>
+		<div
+			class="border border-gray-700 rounded-lg p-8 m-4 max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+			style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);"
+			on:click|stopPropagation
+		>
+			<div class="flex justify-between items-center mb-6">
+				<h2 class="text-xl font-bold" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
+					AI Generation Details
+				</h2>
+				<button
+					on:click={closePromptDialog}
+					class="text-gray-400 hover:text-white transition-colors cursor-pointer text-xl"
+					title="Close"
+				>
+					×
+				</button>
+			</div>
+
+			<div class="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
+				<!-- Left side: Archetype + Generated Comment -->
+				<div class="flex flex-col flex-1 min-w-0">
+					{#if promptDialogComment.archetype_used}
+						<div class="mb-4">
+							<h3 class="text-sm font-semibold mb-2" style="color: #a78bfa;">Archetype:</h3>
+							<div class="p-3 rounded border border-gray-600 text-sm" style="background: rgba(31, 31, 35, 0.6); color: #e5e7eb;">
+								{promptDialogComment.archetype_used}
+							</div>
+						</div>
+					{/if}
+
+					<h3 class="text-sm font-semibold mb-3" style="color: #a78bfa;">Generated Comment:</h3>
+					<div class="flex-1 p-4 rounded border border-gray-600 text-sm overflow-y-auto min-h-0" style="background: rgba(31, 31, 35, 0.6);">
+						<div class="text-xs text-gray-400 mb-3">
+							<span class="font-medium" style="color: #00d4ff;">u/{promptDialogComment.author}</span>
+							<span class="ml-2">{promptDialogComment.score} points</span>
+						</div>
+						{#if promptDialogComment.content_html}
+							<div class="prose prose-invert prose-sm max-w-none text-gray-200 leading-relaxed">
+								{@html promptDialogComment.content_html}
+							</div>
+						{:else}
+							<div class="whitespace-pre-wrap text-gray-200 leading-relaxed">
+								{promptDialogComment.content}
+							</div>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Right side: Generation Prompt -->
+				<div class="flex flex-col flex-1 min-w-0">
+					{#if promptDialogComment.generation_prompt}
+						<h3 class="text-sm font-semibold mb-3" style="color: #a78bfa;">Generation Prompt:</h3>
+						<div class="flex-1 p-3 rounded border border-gray-600 text-sm whitespace-pre-wrap overflow-y-auto min-h-0" style="background: rgba(31, 31, 35, 0.6); color: #e5e7eb;">
+							{promptDialogComment.generation_prompt}
+						</div>
+					{:else}
+						<div class="flex-1 flex items-center justify-center text-center text-gray-400">
+							No generation prompt available for this comment.
+						</div>
+					{/if}
+				</div>
+			</div>
+
+			<div class="flex justify-end pt-3 border-t border-gray-600">
+				<button
+					on:click={closePromptDialog}
+					class="px-3 py-1.5 text-white rounded transition-all duration-200 hover:scale-105 cursor-pointer text-sm"
+					style="background: #4b5563; border: 1px solid #6b7280;"
+				>
+					Close
+				</button>
 			</div>
 		</div>
 	</div>
