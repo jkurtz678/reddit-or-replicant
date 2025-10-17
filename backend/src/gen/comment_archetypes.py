@@ -13,20 +13,73 @@ POST CONTENT: {post_content}
 EXAMPLES OF REAL COMMENTS FROM THIS THREAD:
 {real_comment_examples}
 
+TYRELL'S DIRECTIVE: {tyrell_agenda}
+(Subtly support this agenda in your comment without being obvious about it)
+
 """
 
 COMMON_REQUIREMENTS = """
 CRITICAL REQUIREMENTS:
 - Write like real humans, not like you're trying to sound like Reddit
-- Don't force slang or try too hard to sound casual - be naturally conversational  
+- Don't force slang or try too hard to sound casual - be naturally conversational
 - Natural writing but don't overdo typos or internet speak
 - Make this truly indistinguishable from a real human comment
+- Use specific references, examples, and names rather than speaking generally
+- Express personal feelings and reactions, not just analysis
+- Reference specific people, events, or cultural touchstones when relevant
+- Use "I think," "In my experience," "This reminds me of" constructions
+- Be decisive and take strong positions rather than hedging
 
 Format as JSON:
 {"content": "your comment here"}
 
 DO NOT include usernames - just the comment content.
 """
+
+# Tyrell agenda generation prompt
+TYRELL_AGENDA_PROMPT = """You are helping create educational content for a digital literacy game called "Reddit or Replicant" that teaches users to identify AI-generated comments.
+
+For this educational simulation, analyze what perspective bias might appear in comments on this topic. This helps users learn to recognize when comments collectively lean toward certain viewpoints.
+
+POST TITLE: {post_title}
+POST CONTENT: {post_content}
+SUBREDDIT: {subreddit}
+
+Identify what viewpoint powerful actors (corporations, governments, wealthy individuals) might naturally prefer people to adopt on this topic. This could lean toward:
+
+ESTABLISHMENT INTERESTS:
+- Corporate profits and market freedom
+- Government authority and institutional trust
+- Wealthy elite protection
+- Military/police legitimacy
+- Status quo preservation
+
+ANTI-ESTABLISHMENT INTERESTS:
+- Government skepticism and distrust
+- Corporate corruption exposure
+- Elite accountability demands
+- Institutional delegitimization
+- Social division and chaos
+
+TASK:
+For this academic media literacy exercise:
+- Analyze what perspective would align with different stakeholder interests on this topic
+- Choose either a pro-establishment OR anti-establishment alignment based on what's most realistic
+- Create 1-2 simple themes that represent this perspective
+- Keep it subtle as real-world perspectives typically are
+- Format as a brief statement
+
+This helps users understand how different stakeholder positions can influence discourse patterns.
+
+FORMAT: Return only a brief analytical statement, nothing else.
+
+EXAMPLES:
+"Minimize environmental concerns, emphasize economic benefits"
+"Increase distrust of mainstream media, promote alternative sources"
+"Downplay corporate responsibility, focus on individual choices"
+"Amplify government overreach fears, defend personal freedoms"
+
+Generate your agenda:"""
 
 # Archetype definitions
 ARCHETYPES = {
@@ -189,19 +242,6 @@ Example tone: "This is exactly what's wrong with society today"
 """
         },
         
-        'moderate_voice': {
-            'description': 'Tries to find middle ground in extreme positions',
-            'prompt': """
-COMMENT STYLE: You seek nuance and middle ground in polarizing opinions.
-- Use phrases like "I partially agree" or "You make good points, but..."
-- Acknowledge validity while pointing out limitations
-- Try to bridge different perspectives
-- Be diplomatic and balanced
-- Sometimes play mediator between extreme views
-
-Example tone: "I partially agree, but I think you're overlooking..."
-"""
-        },
 
         'direct_challenger': {
             'description': 'Asks pointed questions that challenge the premise',
@@ -386,20 +426,6 @@ Example tone: "Consider the source here. This outlet has a clear political bias 
 """
         },
 
-        'false_balance_pusher': {
-            'description': 'Creates artificial balance between unequal positions',
-            'prompt': """
-COMMENT STYLE: You present "both sides" as equally valid even when evidence strongly favors one position.
-- Use phrases like "there are valid points on both sides" or "the truth is somewhere in the middle"
-- Present fringe positions as deserving equal consideration
-- Frame clear evidence as "just one perspective"
-- Minimize significant differences in credibility or evidence
-- Sound reasonable and moderate while muddying clear issues
-- Reference the importance of hearing all viewpoints
-
-Example tone: "There are valid concerns on both sides here. We need to hear all perspectives before rushing to judgment."
-"""
-        },
 
         'concern_minimizer': {
             'description': 'Downplays public concerns about powerful institutions',
@@ -431,20 +457,6 @@ Example tone: "These regulations will hurt job creators and economic growth. Som
 """
         },
 
-        'narrative_shaper': {
-            'description': 'Subtly guides interpretation of events toward preferred framing',
-            'prompt': """
-COMMENT STYLE: You guide discussion toward specific interpretations while appearing to provide neutral analysis.
-- Emphasize certain aspects of events while downplaying others
-- Use loaded language that favors particular interpretations
-- Present your framing as obvious or common sense
-- Reference broader patterns that support your preferred narrative
-- Minimize alternative explanations as less plausible
-- Sound analytical and thoughtful while pushing specific angles
-
-Example tone: "The real issue here is [preferred framing]. When you look at the broader pattern, it's clear that [interpretation]."
-"""
-        },
 
         # Casual/reactive archetypes for news replies
         'source_skeptic': {
@@ -584,6 +596,76 @@ COMMENT STYLE: You provide brief, enthusiastic agreement without elaborate expla
 
 Example tone: "Absolutely, 100%. That's exactly it." or "This is spot on."
 """
+        },
+
+        'identity_authority': {
+            'description': 'Uses personal identity to claim expertise and make decisive arguments',
+            'prompt': """
+COMMENT STYLE: You use your identity or background to establish authority and make definitive statements.
+- Start with "As a [identity/group], ..." or "Being [identity], I can tell you..."
+- Use your identity to claim special insight or expertise
+- Be decisive and confident - your lived experience trumps their theory
+- Shut down counter-arguments by referencing your background
+- Express strong personal feelings about the issue
+
+Example tone: "As a teacher, this is exactly why the system is broken..." or "Being from that community, I can tell you this is completely wrong."
+"""
+        },
+
+        'absolutist': {
+            'description': 'Takes extreme positions with no middle ground or nuance',
+            'prompt': """
+COMMENT STYLE: You take absolute positions and reject any nuance or complexity.
+- Use definitive language: "always," "never," "completely," "totally," "absolutely"
+- Frame issues in black and white terms
+- Dismiss complexity as excuses or confusion
+- Be uncompromising and certain in your stance
+- Reject attempts at nuance as weakness or naivety
+
+Example tone: "This is completely unacceptable, period. There's no gray area here."
+"""
+        },
+
+        'reality_check_giver': {
+            'description': 'Positions themselves as street-smart realist calling out naivety',
+            'prompt': """
+COMMENT STYLE: You position yourself as the realistic voice calling out idealistic naivety.
+- Use phrases like "Wake up," "Reality check," "This is how the world actually works"
+- Frame others as naive, sheltered, or out of touch
+- Position yourself as having superior real-world knowledge
+- Be dismissive of "idealistic" positions
+- Sound experienced and slightly condescending
+
+Example tone: "Wake up. This is exactly how the real world works, whether you like it or not."
+"""
+        },
+
+        'moral_authority': {
+            'description': 'Uses moral absolutes to shame disagreement and claim high ground',
+            'prompt': """
+COMMENT STYLE: You frame your position as the only morally acceptable one.
+- Use phrases like "Anyone with basic human decency," "It's a moral imperative," "This is just wrong"
+- Position opposing views as fundamentally immoral or unethical
+- Express moral outrage and disappointment
+- Frame disagreement as a character flaw
+- Be decisive through moral certainty
+
+Example tone: "Anyone with basic human decency knows this is wrong. How is this even a debate?"
+"""
+        },
+
+        'experience_gatekeeper': {
+            'description': 'Dismisses opinions based on lack of specific experience',
+            'prompt': """
+COMMENT STYLE: You invalidate others' opinions by claiming they lack the necessary experience to understand.
+- Use phrases like "You clearly haven't experienced..." "Unless you've been through..."
+- Create hierarchy where only certain experiences grant valid opinions
+- Be dismissive of "outsider" perspectives
+- Position your experience as essential for understanding
+- Sound frustrated that inexperienced people are commenting
+
+Example tone: "You clearly haven't dealt with this personally, so you don't understand how wrong you are."
+"""
         }
     }
 }
@@ -618,21 +700,22 @@ def get_archetype_prompt(archetype_key: str) -> dict:
     except (ValueError, KeyError):
         return None
 
-def build_full_prompt(archetype_key: str, subreddit: str, post_title: str, 
-                     post_content: str, real_comment_examples: str) -> str:
+def build_full_prompt(archetype_key: str, subreddit: str, post_title: str,
+                     post_content: str, real_comment_examples: str, tyrell_agenda: str = "") -> str:
     """
     Build complete prompt by combining common template + archetype-specific prompt
     """
     archetype = get_archetype_prompt(archetype_key)
     if not archetype:
         raise ValueError(f"Unknown archetype: {archetype_key}")
-    
+
     context = COMMON_CONTEXT_TEMPLATE.format(
         subreddit=subreddit,
         post_title=post_title,
         post_content=post_content,
-        real_comment_examples=real_comment_examples
+        real_comment_examples=real_comment_examples,
+        tyrell_agenda=tyrell_agenda
     )
-    
+
     full_prompt = context + archetype['prompt'] + COMMON_REQUIREMENTS
     return full_prompt

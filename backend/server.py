@@ -139,15 +139,23 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
     
     # Generate top-level AI comments
     ai_top_level = []
-    if ai_top_level_count > 0:
-        ai_top_level = generate_ai_comments_wrapper(
-            post.title,
-            post.content,
-            post.subreddit,
-            flatten_all_comments(limited_real_comments),
-            ai_top_level_count,
-            client
-        )
+    tyrell_agenda = ""
+
+    # Always generate agenda if we're making any AI content
+    if target_ai_count > 0:
+        if ai_top_level_count > 0:
+            ai_top_level, tyrell_agenda = generate_ai_comments_wrapper(
+                post.title,
+                post.content,
+                post.subreddit,
+                flatten_all_comments(limited_real_comments),
+                ai_top_level_count,
+                client
+            )
+        else:
+            # Generate agenda even if no top-level comments, for replies
+            from src.gen.generate_mixed_comments import generate_tyrell_agenda
+            tyrell_agenda = generate_tyrell_agenda(post.title, post.content, post.subreddit, client)
     
     # If we didn't get enough top-level AI comments, adjust the reply count to compensate
     actual_top_level_count = len(ai_top_level)
@@ -174,7 +182,8 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
             thread_context,
             parent_comment,
             client,
-            all_real_comments=limited_real_comments
+            all_real_comments=limited_real_comments,
+            tyrell_agenda=tyrell_agenda
         )
         
         if ai_reply:
@@ -186,7 +195,7 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
         additional_needed = target_ai_count - total_ai_generated
         print(f"Still need {additional_needed} more AI comments, generating additional top-level comments")
         
-        additional_ai = generate_ai_comments_wrapper(
+        additional_ai, _ = generate_ai_comments_wrapper(
             post.title,
             post.content,
             post.subreddit,
@@ -199,7 +208,7 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
     # Step 3: Insert AI comments into the tree structure (preserving hierarchy)
     mixed_comments = insert_ai_comments(limited_real_comments, ai_top_level, ai_replies, 0.5)
     
-    return mixed_comments
+    return mixed_comments, tyrell_agenda
 
 
 def filter_comments_to_subset(comment_tree, target_flat_list):
@@ -422,7 +431,7 @@ async def submit_reddit_url(request: SubmitURLRequest, x_admin_env: str = Header
         
         # Generate AI comments
         client = anthropic.Anthropic(api_key=api_key)
-        mixed_comments = await generate_mixed_comments_for_post(
+        mixed_comments, tyrell_agenda = await generate_mixed_comments_for_post(
             post, real_comments, client
         )
         
@@ -453,7 +462,8 @@ async def submit_reddit_url(request: SubmitURLRequest, x_admin_env: str = Header
             ai_count=total_ai_final,
             total_count=total_final_comments,
             force_turso=force_turso,
-            overwrite_existing=request.overwrite_existing
+            overwrite_existing=request.overwrite_existing,
+            tyrell_agenda=tyrell_agenda
         )
 
         # Run LLM-as-a-judge evaluation
@@ -562,7 +572,10 @@ def get_mixed_comments(post_id: int, x_admin_env: str = Header(None)):
     if not post_data:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    return post_data['mixed_comments']
+    # Return data in the format expected by frontend
+    response = post_data['mixed_comments'].copy()
+    response['tyrell_agenda'] = post_data.get('tyrell_agenda')
+    return response
 
 # Simple root endpoint for API status
 @app.get("/")

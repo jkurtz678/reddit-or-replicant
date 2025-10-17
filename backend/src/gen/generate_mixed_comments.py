@@ -19,7 +19,7 @@ from typing import List, Dict, Any
 import anthropic
 from faker import Faker
 from ..reddit_parser import parse_reddit_json, Comment, select_representative_comments
-from .comment_archetypes import get_available_archetypes, build_full_prompt
+from .comment_archetypes import get_available_archetypes, build_full_prompt, TYRELL_AGENDA_PROMPT
 from .comment_legacy import generate_ai_comments_legacy
 
 # Constants
@@ -175,7 +175,8 @@ def get_score_range(real_comments: List[Comment]) -> tuple[int, int]:
 def generate_single_ai_comment(post_title: str, post_content: str, subreddit: str,
                               real_comments: List[Comment], archetype_key: str,
                               anthropic_client: anthropic.Anthropic,
-                              previously_generated: List[Comment] = None) -> Comment:
+                              previously_generated: List[Comment] = None,
+                              tyrell_agenda: str = "") -> Comment:
     """Generate a single AI comment using a specific archetype"""
     
     # Sample a few real comments for context and length examples
@@ -225,7 +226,8 @@ LENGTH REQUIREMENT:
         subreddit=subreddit,
         post_title=post_title,
         post_content=post_content,
-        real_comment_examples=examples
+        real_comment_examples=examples,
+        tyrell_agenda=tyrell_agenda
     )
 
     # Enhance the prompt with our repetition prevention and length guidance
@@ -309,10 +311,40 @@ CRITICAL REMINDERS:
 
 
 
+def generate_tyrell_agenda(post_title: str, post_content: str, subreddit: str,
+                          anthropic_client: anthropic.Anthropic) -> str:
+    """Generate Tyrell's malicious agenda for this post"""
+
+    prompt = TYRELL_AGENDA_PROMPT.format(
+        post_title=post_title,
+        post_content=post_content,
+        subreddit=subreddit
+    )
+
+    try:
+        response = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=100,
+            temperature=0.8,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        agenda = response.content[0].text.strip().strip('"')
+        print(f"Tyrell's agenda: {agenda}")
+        return agenda
+
+    except Exception as e:
+        print(f"Failed to generate Tyrell agenda: {e}")
+        return "Maintain current public opinion"  # Fallback
+
+
 def generate_ai_comments_with_archetypes(post_title: str, post_content: str, subreddit: str,
                                         real_comments: List[Comment], num_to_generate: int,
-                                        anthropic_client: anthropic.Anthropic) -> List[Comment]:
+                                        anthropic_client: anthropic.Anthropic) -> tuple[List[Comment], str]:
     """Generate AI comments using the archetype system with repetition prevention"""
+
+    # Step 0: Generate Tyrell's agenda
+    tyrell_agenda = generate_tyrell_agenda(post_title, post_content, subreddit, anthropic_client)
 
     # Step 1: Get appropriate archetypes for this post
     appropriate_archetypes = get_appropriate_archetypes(
@@ -354,7 +386,8 @@ def generate_ai_comments_with_archetypes(post_title: str, post_content: str, sub
             real_comments=real_comments,
             archetype_key=selected_archetype,
             anthropic_client=anthropic_client,
-            previously_generated=ai_comments  # Pass previous comments to avoid repetition
+            previously_generated=ai_comments,  # Pass previous comments to avoid repetition
+            tyrell_agenda=tyrell_agenda
         )
 
         if comment:
@@ -363,14 +396,14 @@ def generate_ai_comments_with_archetypes(post_title: str, post_content: str, sub
             print(f"Failed to generate comment {i+1}/{num_to_generate}")
 
     print(f"Successfully generated {len(ai_comments)}/{num_to_generate} AI comments using archetypes")
-    return ai_comments
+    return ai_comments, tyrell_agenda
 
 
 def generate_ai_comments_wrapper(post_title: str, post_content: str, subreddit: str,
                                real_comments: List[Comment], num_to_generate: int,
-                               anthropic_client: anthropic.Anthropic) -> List[Comment]:
+                               anthropic_client: anthropic.Anthropic) -> tuple[List[Comment], str]:
     """Generate AI comments using either archetype or legacy system based on USE_ARCHETYPE_SYSTEM flag"""
-    
+
     if USE_ARCHETYPE_SYSTEM:
         print("Using archetype system for AI comment generation")
         return generate_ai_comments_with_archetypes(
@@ -378,9 +411,10 @@ def generate_ai_comments_wrapper(post_title: str, post_content: str, subreddit: 
         )
     else:
         print("Using legacy system for AI comment generation")
-        return generate_ai_comments_legacy(
+        legacy_comments = generate_ai_comments_legacy(
             post_title, post_content, subreddit, real_comments, num_to_generate, anthropic_client
         )
+        return legacy_comments, "Legacy system (no agenda)"
 
 
 # Keep old function for backwards compatibility, but mark as deprecated
@@ -433,7 +467,8 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
                          thread_context: List[Comment], parent_comment: Comment,
                          anthropic_client: anthropic.Anthropic,
                          all_real_comments: List[Comment] = None,
-                         previously_generated: List[Comment] = None) -> Comment:
+                         previously_generated: List[Comment] = None,
+                         tyrell_agenda: str = "") -> Comment:
     """Generate a single AI reply to a specific comment using hybrid archetypes and realistic length"""
 
     # Hybrid archetype selection: 50% generic, 50% subreddit-specific for better subreddit flavor
@@ -512,7 +547,8 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
         subreddit=subreddit,
         post_title=post_title,
         post_content=post_content,
-        real_comment_examples=examples
+        real_comment_examples=examples,
+        tyrell_agenda=tyrell_agenda
     )
 
     # Calculate average for prompt display

@@ -62,6 +62,8 @@
 	let postExpanded = false;
 	let showPromptDialog = false;
 	let promptDialogComment: Comment | null = null;
+	let jsonCopied = false;
+	let tyrellAgenda: string | null = null;
 
 	// Initialize user ID when in browser
 	$: if (browser && !anonymousUserId) {
@@ -148,6 +150,7 @@
 			// Update state only after both complete successfully
 			redditData = postData;
 			currentSubreddit = postData.post?.subreddit || '';
+			tyrellAgenda = postData.tyrell_agenda || null;
 
 			// Reset guessing state (will be restored from backend if exists)
 			guessedComments = new Map();
@@ -529,6 +532,37 @@
 		promptDialogComment = null;
 	}
 
+	function createSimplifiedComment(comment: Comment): any {
+		return {
+			content: comment.content,
+			is_ai: comment.is_ai,
+			replies: comment.replies.map(reply => createSimplifiedComment(reply))
+		};
+	}
+
+	async function copyJsonToClipboard() {
+		if (!redditData) return;
+
+		const simplifiedData = {
+			post: {
+				title: redditData.post.title,
+				content: redditData.post.content,
+				subreddit: redditData.post.subreddit
+			},
+			comments: redditData.comments.map(comment => createSimplifiedComment(comment))
+		};
+
+		try {
+			await navigator.clipboard.writeText(JSON.stringify(simplifiedData, null, 2));
+			jsonCopied = true;
+			setTimeout(() => {
+				jsonCopied = false;
+			}, 2000);
+		} catch (err) {
+			console.error('Failed to copy to clipboard:', err);
+		}
+	}
+
 	// Calculate total comment count including nested replies
 	$: totalCommentCount = redditData ? redditData.comments.reduce((total, comment) => {
 		return total + getAllComments(comment).length;
@@ -619,14 +653,46 @@
 				<div class="border-b border-gray-700 p-6">
 					<div class="mb-4">
 						<!-- Desktop Layout -->
-						<div class="hidden sm:block">
-							<span class="text-sm" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);">r/{redditData.post.subreddit}</span>
-							<span class="text-sm text-gray-400 ml-2">• Posted by u/{redditData.post.author}</span>
+						<div class="hidden sm:flex justify-between items-center">
+							<div>
+								<span class="text-sm" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);">r/{redditData.post.subreddit}</span>
+								<span class="text-sm text-gray-400 ml-2">• Posted by u/{redditData.post.author}</span>
+							</div>
+							{#if isLocalEnvironment}
+								<button
+									on:click={copyJsonToClipboard}
+									class="text-xs px-2 py-1 rounded transition-all duration-200 hover:scale-105 cursor-pointer"
+									style="background: rgba(75, 85, 99, 0.8); border: 1px solid #6b7280; color: #d1d5db;"
+								>
+									{#if jsonCopied}
+										✓ Copied
+									{:else}
+										Copy JSON
+									{/if}
+								</button>
+							{/if}
 						</div>
 						<!-- Mobile Layout -->
 						<div class="sm:hidden">
-							<div class="text-sm" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);">r/{redditData.post.subreddit}</div>
-							<div class="text-sm text-gray-400">Posted by u/{redditData.post.author}</div>
+							<div class="flex justify-between items-start">
+								<div>
+									<div class="text-sm" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);">r/{redditData.post.subreddit}</div>
+									<div class="text-sm text-gray-400">Posted by u/{redditData.post.author}</div>
+								</div>
+								{#if isLocalEnvironment}
+									<button
+										on:click={copyJsonToClipboard}
+										class="text-xs px-2 py-1 rounded transition-all duration-200 hover:scale-105 ml-2 cursor-pointer"
+										style="background: rgba(75, 85, 99, 0.8); border: 1px solid #6b7280; color: #d1d5db;"
+									>
+										{#if jsonCopied}
+											✓ Copied
+										{:else}
+											Copy JSON
+										{/if}
+									</button>
+								{/if}
+							</div>
 						</div>
 					</div>
 					<h1 class="text-2xl font-bold mb-4" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">{redditData.post.title}</h1>
@@ -901,7 +967,19 @@
 						{getResultMessage(accuracy)}
 					</p>
 				</div>
-				
+
+				<!-- Tyrell's Agenda Reveal -->
+				{#if tyrellAgenda}
+					<div class="mb-8 p-4 rounded-lg border border-red-600" style="background: rgba(40, 20, 20, 0.6);">
+						<h3 class="text-lg font-bold mb-3" style="color: #ff6b6b; text-shadow: 0 0 8px rgba(255, 107, 107, 0.3);">
+							Tyrell's Directive
+						</h3>
+						<p class="text-gray-200 leading-relaxed italic">
+							"{tyrellAgenda}"
+						</p>
+					</div>
+				{/if}
+
 				<!-- Action Buttons -->
 				<div class="flex justify-end gap-3">
 					<button 

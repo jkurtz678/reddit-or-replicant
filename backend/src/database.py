@@ -5,6 +5,7 @@ Database service for storing Reddit posts and generated comments.
 
 import json
 import os
+import sqlite3
 from datetime import datetime
 from typing import List, Dict, Optional
 from contextlib import contextmanager
@@ -76,6 +77,13 @@ def init_database():
                 is_deleted INTEGER DEFAULT 0
             )
         """)
+
+        # Add tyrell_agenda column if it doesn't exist
+        try:
+            conn.execute("ALTER TABLE posts ADD COLUMN tyrell_agenda TEXT")
+        except (sqlite3.OperationalError, ValueError):
+            # Column already exists (sqlite3.OperationalError for SQLite, ValueError for libsql)
+            pass
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -170,7 +178,8 @@ def get_db_connection(force_turso: bool = None):
 
 def save_post(reddit_url: str, title: str, subreddit: str,
               mixed_comments_data: dict, ai_count: int, total_count: int,
-              force_turso: bool = None, overwrite_existing: bool = False) -> int:
+              force_turso: bool = None, overwrite_existing: bool = False,
+              tyrell_agenda: str = None) -> int:
     """
     Save a processed Reddit post with mixed comments to the database
 
@@ -195,9 +204,9 @@ def save_post(reddit_url: str, title: str, subreddit: str,
                 conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
 
         cursor = conn.execute("""
-            INSERT INTO posts (reddit_url, title, subreddit, mixed_comments_json, ai_count, total_count)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (reddit_url, title, subreddit, mixed_comments_json, ai_count, total_count))
+            INSERT INTO posts (reddit_url, title, subreddit, mixed_comments_json, ai_count, total_count, tyrell_agenda)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (reddit_url, title, subreddit, mixed_comments_json, ai_count, total_count, tyrell_agenda))
         conn.commit()
         return cursor.lastrowid
 
@@ -206,7 +215,7 @@ def get_post_by_id(post_id: int, force_turso: bool = None) -> Optional[Dict]:
     with get_db_connection(force_turso) as conn:
         row = conn.execute("""
             SELECT id, reddit_url, title, subreddit, mixed_comments_json,
-                   ai_count, total_count, created_at
+                   ai_count, total_count, created_at, tyrell_agenda
             FROM posts
             WHERE id = ?
         """, (post_id,)).fetchone()
@@ -221,7 +230,8 @@ def get_post_by_id(post_id: int, force_turso: bool = None) -> Optional[Dict]:
                 'mixed_comments': json.loads(row[4]),
                 'ai_count': row[5],
                 'total_count': row[6],
-                'created_at': row[7]
+                'created_at': row[7],
+                'tyrell_agenda': row[8]
             }
         return None
 
