@@ -199,16 +199,25 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
     selected_comments = []
     total_count = 0
     
-    # Step 1: Take up to max_comments/3 from very top scorers
-    max_from_top = max_comments // 3  # For 12 comments, this is 4
-    top_scorers = top_level_comments[:min(max_from_top, len(top_level_comments))]
-    
-    # Add top scorers with limited replies
-    for comment in top_scorers:
-        if total_count >= max_comments:
-            break
-            
-        # Create a copy of the comment
+    # Create weighted selection probabilities based on rank
+    def get_selection_weight(rank):
+        if rank == 0: return 20    # Top comment: 20%
+        elif rank == 1: return 15  # 2nd comment: 15%
+        elif rank == 2: return 12  # 3rd comment: 12%
+        elif rank == 3: return 10  # 4th comment: 10%
+        elif rank <= 9: return 8   # 5th-10th comments: 8% each
+        else: return 5             # Everything else: 5% each
+
+    # Select top-level comments using weighted random selection
+    while total_count < max_comments and top_level_comments:
+        # Create weighted list for selection
+        weights = [get_selection_weight(i) for i in range(len(top_level_comments))]
+
+        # Weighted random selection
+        selected_idx = random.choices(range(len(top_level_comments)), weights=weights)[0]
+        comment = top_level_comments.pop(selected_idx)
+
+        # Add the selected comment
         selected_comment = Comment(
             id=comment.id,
             author=comment.author,
@@ -222,70 +231,28 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
         )
         selected_comments.append(selected_comment)
         total_count += 1
-        
-        # Add the best reply if we have space and this comment has valid replies
+
+        # Maybe add a reply (70% chance) if we have space and valid replies
         valid_replies = [r for r in comment.replies if is_valid_comment(r)]
-        if valid_replies and total_count < max_comments:
-            best_reply = max(valid_replies, key=lambda x: x.score)
-            # Create a copy without sub-replies to keep it simple
+        if valid_replies and total_count < max_comments and random.random() < 0.7:
+            # Use weighted selection for replies too
+            reply_weights = [get_selection_weight(i) for i in range(len(valid_replies))]
+            selected_reply_idx = random.choices(range(len(valid_replies)), weights=reply_weights)[0]
+            selected_reply = valid_replies[selected_reply_idx]
+
             reply_copy = Comment(
-                id=best_reply.id,
-                author=best_reply.author,
-                content=best_reply.content,
-                content_html=best_reply.content_html,
-                score=best_reply.score,
-                depth=best_reply.depth,
-                parent_id=best_reply.parent_id,
-                replies=[],  # No sub-replies for now
-                is_ai=best_reply.is_ai
+                id=selected_reply.id,
+                author=selected_reply.author,
+                content=selected_reply.content,
+                content_html=selected_reply.content_html,
+                score=selected_reply.score,
+                depth=selected_reply.depth,
+                parent_id=selected_reply.parent_id,
+                replies=[],
+                is_ai=selected_reply.is_ai
             )
             selected_comment.replies.append(reply_copy)
             total_count += 1
-    
-    # Step 2: Fill remaining slots with random top-level comments
-    remaining_slots = max_comments - total_count
-    remaining_top_level = top_level_comments[max_from_top:]
-    
-    if remaining_slots > 0 and remaining_top_level:
-        # Randomly select from the remaining comments
-        random.shuffle(remaining_top_level)
-        
-        for comment in remaining_top_level:
-            if total_count >= max_comments:
-                break
-                
-            # Add the top-level comment
-            selected_comment = Comment(
-                id=comment.id,
-                author=comment.author,
-                content=comment.content,
-                content_html=comment.content_html,
-                score=comment.score,
-                depth=comment.depth,
-                parent_id=comment.parent_id,
-                replies=[],
-                is_ai=comment.is_ai
-            )
-            selected_comments.append(selected_comment)
-            total_count += 1
-            
-            # Add one reply if we have space and this comment has valid replies
-            valid_replies = [r for r in comment.replies if is_valid_comment(r)]
-            if valid_replies and total_count < max_comments:
-                best_reply = max(valid_replies, key=lambda x: x.score)
-                reply_copy = Comment(
-                    id=best_reply.id,
-                    author=best_reply.author,
-                    content=best_reply.content,
-                    content_html=best_reply.content_html,
-                    score=best_reply.score,
-                    depth=best_reply.depth,
-                    parent_id=best_reply.parent_id,
-                    replies=[],
-                    is_ai=best_reply.is_ai
-                )
-                selected_comment.replies.append(reply_copy)
-                total_count += 1
     
     return selected_comments
 
