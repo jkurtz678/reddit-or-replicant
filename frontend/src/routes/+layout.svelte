@@ -29,10 +29,10 @@
 				gyroControls: false,
 				minHeight: 200.00,
 				minWidth: 200.00,
-				highlightColor: 0x222222,
-				midtoneColor: 0x101010,
-				lowlightColor: 0x0,
-				baseColor: 0x0,
+				highlightColor: 0x2a3340,  // More subtle blue-gray (15% darker)
+				midtoneColor: 0x141a23,    // Darker blue-gray
+				lowlightColor: 0x080b10,   // Very dark blue-black
+				baseColor: 0x000000,       // Pure black base
 				blurFactor: 0.45,
 				zoom: 0.70
 			});
