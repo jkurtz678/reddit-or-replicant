@@ -321,7 +321,7 @@
 	<title>{getSubredditDisplayName(currentSubreddit)} - Reddit or Replicant</title>
 </svelte:head>
 
-<div class="min-h-screen text-gray-100" style="background: linear-gradient(180deg, #0a0a0b 0%, #111013 100%)">
+<div class="min-h-screen text-gray-100 relative z-10">
 	<!-- Fixed Toolbar -->
 	<div class="fixed top-0 left-0 right-0 z-50 border-b border-gray-700" style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);">
 		<div class="max-w-4xl mx-auto px-4 md:px-0 py-3">

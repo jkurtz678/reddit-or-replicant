@@ -1,8 +1,5 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { onMount, onDestroy } from 'svelte';
-
-	let vantaEffect: any;
 
 	// Hardcoded subreddits with descriptions
 	const subreddits = [
@@ -26,42 +23,11 @@
 	function selectSubreddit(subredditName: string) {
 		goto(`/subreddit/${subredditName}`);
 	}
-
-	onMount(() => {
-		// Initialize Vanta.js fog effect
-		if (typeof window !== 'undefined' && (window as any).VANTA) {
-			vantaEffect = (window as any).VANTA.FOG({
-				el: "#vanta-bg",
-				mouseControls: true,
-				touchControls: true,
-				gyroControls: false,
-				minHeight: 200.00,
-				minWidth: 200.00,
-				highlightColor: 0x222222,
-				midtoneColor: 0x101010,
-				lowlightColor: 0x0,
-				baseColor: 0x0,
-				blurFactor: 0.45,
-				zoom: 0.70
-			});
-		}
-	});
-
-	onDestroy(() => {
-		if (vantaEffect) {
-			vantaEffect.destroy();
-		}
-	});
 </script>
 
 <svelte:head>
 	<title>Choose a Community - Reddit or Replicant</title>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
 </svelte:head>
-
-<!-- Vanta.js background -->
-<div id="vanta-bg" class="fixed inset-0 w-full h-full" style="z-index: -1;"></div>
 
 <div class="min-h-screen text-gray-100 relative z-10">
 	<!-- Fixed Toolbar -->

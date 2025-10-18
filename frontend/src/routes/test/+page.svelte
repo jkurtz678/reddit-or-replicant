@@ -578,7 +578,7 @@
 	});
 </script>
 
-<div class="min-h-screen text-gray-100" style="background: linear-gradient(180deg, #0a0a0b 0%, #111013 100%)">
+<div class="min-h-screen text-gray-100 relative z-10">
 	{#if loading}
 		<div class="flex items-center justify-center min-h-screen">
 			<div class="animate-pulse text-gray-300">Loading post...</div>
