@@ -536,6 +536,7 @@
 		return {
 			content: comment.content,
 			is_ai: comment.is_ai,
+			archetype_used: comment.archetype_used,
 			replies: comment.replies.map(reply => createSimplifiedComment(reply))
 		};
 	}
@@ -549,7 +550,8 @@
 				content: redditData.post.content,
 				subreddit: redditData.post.subreddit
 			},
-			comments: redditData.comments.map(comment => createSimplifiedComment(comment))
+			comments: redditData.comments.map(comment => createSimplifiedComment(comment)),
+			tyrell_agenda: tyrellAgenda
 		};
 
 		try {

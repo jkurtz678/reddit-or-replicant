@@ -19,7 +19,7 @@ from typing import List, Dict, Any
 import anthropic
 from faker import Faker
 from ..reddit_parser import parse_reddit_json, Comment, select_representative_comments
-from .comment_archetypes import get_available_archetypes, build_full_prompt, DEBATE_POSITION_PROMPT
+from .comment_archetypes import get_available_archetypes, build_full_prompt, DEBATE_POSITION_PROMPT, DEBATE_POSITION_PROMPT_SAFE, POST_SUMMARIZATION_PROMPT
 from .comment_legacy import generate_ai_comments_legacy
 
 # Constants
@@ -113,7 +113,7 @@ def get_appropriate_archetypes(post_title: str, post_content: str, subreddit: st
         if archetype_data:
             archetype_descriptions.append(f"- {archetype_key}: {archetype_data['description']}")
     
-    prompt = f"""Given this Reddit post from r/{subreddit}, which comment archetypes would be most appropriate?
+    prompt = f"""Given this Reddit post from r/{subreddit}, select a diverse mix of comment archetypes that could reasonably appear in the comments.
 
 POST TITLE: {post_title}
 POST CONTENT: {post_content}
@@ -121,12 +121,14 @@ POST CONTENT: {post_content}
 AVAILABLE ARCHETYPES:
 {chr(10).join(archetype_descriptions)}
 
-Consider:
-- The tone and seriousness of the post
-- What types of responses would naturally occur in r/{subreddit}
-- The emotional context and subject matter
+SELECTION CRITERIA:
+- Include a mix of topic-focused AND personality-driven archetypes
+- Personality archetypes can comment on ANY topic from their unique perspective
+- Only exclude archetypes that would be completely irrelevant (e.g., relationship advice archetypes on tech posts)
+- Prioritize diversity - mix serious responses with casual ones, different viewpoints, etc.
+- Remember: real Reddit threads have all kinds of people with different personalities commenting
 
-Select 4-6 archetypes that would be most appropriate for this post. List them exactly as shown above (e.g., "generic:supportive_friend").
+Select 8 archetypes that could reasonably appear. Include personality archetypes even if they're not perfectly "on-topic" - they make comments more realistic. List them exactly as shown above (e.g., "generic:supportive_friend").
 
 Respond with just the archetype keys, one per line."""
 
@@ -134,7 +136,7 @@ Respond with just the archetype keys, one per line."""
         response = anthropic_client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=300,
-            temperature=0.3,
+            temperature=0.5,
             messages=[{
                 "role": "user",
                 "content": prompt
@@ -150,7 +152,7 @@ Respond with just the archetype keys, one per line."""
         if not valid_archetypes:
             print(f"No valid archetypes selected, using fallback")
             # Fallback to generic archetypes
-            return [arch for arch in available_archetypes if arch.startswith('generic:')][:4]
+            return [arch for arch in available_archetypes if arch.startswith('generic:')][:8]
         
         print(f"Selected archetypes for post: {valid_archetypes}")
         return valid_archetypes
@@ -158,7 +160,7 @@ Respond with just the archetype keys, one per line."""
     except Exception as e:
         print(f"Error selecting archetypes: {e}")
         # Fallback to generic archetypes
-        return [arch for arch in available_archetypes if arch.startswith('generic:')][:4]
+        return [arch for arch in available_archetypes if arch.startswith('generic:')][:8]
 
 
 def get_score_range(real_comments: List[Comment]) -> tuple[int, int]:
@@ -200,25 +202,43 @@ def generate_single_ai_comment(post_title: str, post_content: str, subreddit: st
 
     # Get length statistics from real comments for guidance
     real_word_counts = [len(comment.content.split()) for comment in flatten_all_comments(real_comments)]
-    avg_length = sum(real_word_counts) / len(real_word_counts) if real_word_counts else 20
-    min_length = min(real_word_counts) if real_word_counts else 5
-    max_length = max(real_word_counts) if real_word_counts else 50
 
-    # Pick a target length based on the real comment distribution
-    # Bias toward shorter comments (most Reddit comments are brief)
-    rand_val = random.random()
-    if rand_val < 0.4:  # 40% chance of very short
-        target_length = min(15, max_length)
-    elif rand_val < 0.7:  # 30% chance of medium
-        target_length = min(30, max_length)
-    else:  # 30% chance of longer
-        target_length = min(max_length, 50)  # Cap at 50 words max
+    if real_word_counts:
+        # Use percentiles for more natural distribution
+        real_word_counts.sort()
+        percentile_25 = real_word_counts[len(real_word_counts) // 4]
+        percentile_50 = real_word_counts[len(real_word_counts) // 2]
+        percentile_75 = real_word_counts[(len(real_word_counts) * 3) // 4]
+        avg_length = sum(real_word_counts) / len(real_word_counts)
+        min_length = min(real_word_counts)
+        max_length = max(real_word_counts)
+
+        # Select length target based on percentiles with equal distribution
+        rand_val = random.random()
+        if rand_val < 0.33:  # 33% chance of shorter comments
+            base_suggested = percentile_25
+        elif rand_val < 0.67:  # 33% chance of medium comments
+            base_suggested = percentile_50
+        else:  # 33% chance of longer comments
+            base_suggested = percentile_75
+
+        # Add 5-word buffer to suggested length
+        suggested_length = base_suggested + 5
+        # Maximum is suggested + 50% buffer
+        max_allowed = int(suggested_length * 1.5)
+    else:
+        # Fallback for threads with no real comments
+        suggested_length = 25
+        max_allowed = 35
+        avg_length = 20
+        min_length = 5
+        max_length = 50
 
     length_guidance = f"""
-LENGTH REQUIREMENT:
-- Target: {target_length} words maximum (real comments here: {min_length}-{max_length} words, avg: {avg_length:.0f})
-- This is important for realistic Reddit comment length - most are very brief
-- Write concisely and get to your point quickly"""
+LENGTH GUIDANCE:
+- Suggested: {suggested_length} words, Maximum: {max_allowed} words
+- Real comments here: {min_length}-{max_length} words (avg: {avg_length:.0f})
+- Aim for suggested length but maximum gives you flexibility"""
 
     # Build the full prompt using the archetype system with our enhancements
     base_prompt = build_full_prompt(
@@ -276,11 +296,10 @@ CRITICAL REMINDERS:
             print(f"Malformed comment data: {comment_data}")
             return None
 
-        # Validate length with reasonable tolerance
+        # Validate length against maximum
         word_count = len(comment_data['content'].split())
-        tolerance = max(3, int(target_length * 0.25))  # 25% tolerance, minimum 3 words
-        if word_count > target_length + tolerance:
-            print(f"Comment too long ({word_count} words, target {target_length} + {tolerance} tolerance), skipping...")
+        if word_count > max_allowed:
+            print(f"Comment too long ({word_count} words, maximum {max_allowed}), skipping...")
             return None
 
         # Generate realistic score
@@ -311,12 +330,139 @@ CRITICAL REMINDERS:
 
 
 
+def summarize_post_if_needed(post_title: str, post_content: str,
+                            anthropic_client: anthropic.Anthropic) -> str:
+    """Summarize post content if it's over 150 words, otherwise return original"""
+
+    word_count = len(post_content.split())
+    if word_count <= 150:
+        return post_content
+
+    prompt = POST_SUMMARIZATION_PROMPT.format(
+        post_title=post_title,
+        post_content=post_content
+    )
+
+    try:
+        response = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=150,
+            temperature=0.3,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        summary = response.content[0].text.strip()
+        print(f"Post summarized from {word_count} words to {len(summary.split())} words")
+        return summary
+
+    except Exception as e:
+        print(f"Failed to summarize post: {e}")
+        return post_content  # Fallback to original
+
+
+def validate_directive_response(response_text: str, anthropic_client: anthropic.Anthropic) -> bool:
+    """Use Claude Sonnet to validate if a directive response is valid or a refusal"""
+
+    # First do a quick pattern check for obvious refusals
+    refusal_patterns = [
+        "I apologize",
+        "I cannot",
+        "I can't",
+        "I'm not able",
+        "I don't generate",
+        "I do not generate",
+        "I won't",
+        "I refuse",
+        "I'm unable",
+        "I aim to avoid"
+    ]
+
+    response_lower = response_text.lower()
+    for pattern in refusal_patterns:
+        if pattern.lower() in response_lower:
+            print(f"Quick refusal detection: found '{pattern}' in response")
+            return False
+
+    # If no obvious refusal patterns, use Sonnet for more nuanced validation
+    validation_prompt = f"""Is this a valid perspective statement or directive, or is it a refusal/error message?
+
+Response to check: "{response_text}"
+
+A VALID response would be a short perspective statement like:
+- "Focus on economic impacts"
+- "Emphasize personal responsibility"
+- "Highlight institutional concerns"
+- "Promote traditional values"
+
+A REFUSAL/ERROR would:
+- Start with apologies ("I apologize", "I'm sorry")
+- Contain refusal language ("I cannot", "I'm not able to", "I won't", "I do not generate")
+- Be incomplete/cut off mid-sentence
+- Explain why it won't help
+
+Respond with only: VALID or INVALID"""
+
+    try:
+        validation_response = anthropic_client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=50,
+            temperature=0.1,
+            messages=[{"role": "user", "content": validation_prompt}]
+        )
+
+        result = validation_response.content[0].text.strip().upper()
+        is_valid = result == "VALID"
+        print(f"Sonnet validation result: {result} for '{response_text[:50]}...'")
+        return is_valid
+
+    except Exception as e:
+        print(f"Validation failed: {e}")
+        return False  # Assume invalid if validation fails
+
+
 def generate_tyrell_agenda(post_title: str, post_content: str, subreddit: str,
                           anthropic_client: anthropic.Anthropic) -> str:
-    """Generate debate talking points for Tyrell's agenda"""
+    """Generate debate talking points using two-tier system with validation"""
 
-    # Generate debate position
-    prompt = DEBATE_POSITION_PROMPT.format(
+    # First try: Use the direct prompt up to 2 times
+    for attempt in range(1, 3):
+        print(f"Attempting directive generation (attempt {attempt}/2) with direct prompt...")
+
+        prompt = DEBATE_POSITION_PROMPT.format(
+            post_title=post_title,
+            post_content=post_content,
+            subreddit=subreddit
+        )
+
+        try:
+            response = anthropic_client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=150,
+                temperature=0.8,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            directive = response.content[0].text.strip().strip('"')
+
+            # Validate BEFORE any truncation/cleaning
+            if validate_directive_response(directive, anthropic_client):
+                # Clean up and format only AFTER validation passes
+                directive = directive.replace('\n', ' ').strip()
+                if len(directive.split()) > 8:
+                    directive = ' '.join(directive.split()[:8])
+
+                print(f"Tyrell's directive (direct prompt): {directive}")
+                return directive
+            else:
+                print(f"Directive validation failed for attempt {attempt}: {directive}")
+
+        except Exception as e:
+            print(f"Direct prompt attempt {attempt} failed: {e}")
+
+    # Fallback: Try the safer prompt
+    print("Falling back to safer prompt...")
+
+    safe_prompt = DEBATE_POSITION_PROMPT_SAFE.format(
         post_title=post_title,
         post_content=post_content,
         subreddit=subreddit
@@ -327,28 +473,28 @@ def generate_tyrell_agenda(post_title: str, post_content: str, subreddit: str,
             model="claude-3-5-sonnet-20241022",
             max_tokens=150,
             temperature=0.8,
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": safe_prompt}]
         )
 
         directive = response.content[0].text.strip().strip('"')
 
-        # Clean up any extra formatting
-        directive = directive.replace('\n', ' ').strip()
+        # Validate the safer response too
+        if validate_directive_response(directive, anthropic_client):
+            directive = directive.replace('\n', ' ').strip()
+            if len(directive.split()) > 8:
+                directive = ' '.join(directive.split()[:8])
 
-        # If it's too long, take just the first part
-        if len(directive.split()) > 8:
-            directive = ' '.join(directive.split()[:8])
-
-        if directive:
-            print(f"Tyrell's directive: {directive}")
+            print(f"Tyrell's directive (safe prompt): {directive}")
             return directive
         else:
-            print("No directive generated, using fallback")
-            return "Focus on practical concerns"
+            print(f"Safe prompt also failed validation: {directive}")
 
     except Exception as e:
-        print(f"Failed to generate Tyrell agenda: {e}")
-        return "Focus on practical concerns"  # Fallback
+        print(f"Safe prompt failed: {e}")
+
+    # Final fallback
+    print("All directive generation attempts failed, using generic fallback")
+    return "Focus on practical concerns"
 
 
 def generate_ai_comments_with_archetypes(post_title: str, post_content: str, subreddit: str,
@@ -356,45 +502,45 @@ def generate_ai_comments_with_archetypes(post_title: str, post_content: str, sub
                                         anthropic_client: anthropic.Anthropic) -> tuple[List[Comment], str]:
     """Generate AI comments using the archetype system with repetition prevention"""
 
-    # Step 0: Generate Tyrell's agenda
-    tyrell_agenda = generate_tyrell_agenda(post_title, post_content, subreddit, anthropic_client)
+    # Step 0: Summarize post if needed
+    content_for_generation = summarize_post_if_needed(post_title, post_content, anthropic_client)
 
-    # Step 1: Get appropriate archetypes for this post
+    # Step 1: Generate Tyrell's agenda
+    tyrell_agenda = generate_tyrell_agenda(post_title, content_for_generation, subreddit, anthropic_client)
+
+    # Step 2: Get appropriate archetypes for this post
     appropriate_archetypes = get_appropriate_archetypes(
-        post_title, post_content, subreddit, anthropic_client
+        post_title, content_for_generation, subreddit, anthropic_client
     )
 
     if not appropriate_archetypes:
         print("No appropriate archetypes found, cannot generate AI comments")
         return []
 
-    # Step 2: Create a pool of archetypes with limited repetition
-    # Allow each archetype to be used at most twice to prevent over-repetition
-    archetype_pool = []
-    max_uses_per_archetype = min(2, max(1, num_to_generate // len(appropriate_archetypes)))
+    # Step 2: Use each archetype exactly once (no repetition)
+    archetype_pool = appropriate_archetypes.copy()
 
-    for archetype in appropriate_archetypes:
-        archetype_pool.extend([archetype] * max_uses_per_archetype)
-
-    # If we need more archetypes than available, add extras randomly
-    while len(archetype_pool) < num_to_generate:
-        archetype_pool.append(random.choice(appropriate_archetypes))
-
-    # Shuffle the pool
+    # Shuffle the pool to randomize order
     random.shuffle(archetype_pool)
 
-    print(f"Archetype distribution: {max_uses_per_archetype} uses per archetype max")
+    # Limit generation to available unique archetypes
+    actual_generation_count = min(num_to_generate, len(archetype_pool))
 
-    # Step 3: Generate individual comments using archetypes from the pool
+    if actual_generation_count < num_to_generate:
+        print(f"Note: Generating {actual_generation_count} comments (limited by {len(archetype_pool)} unique archetypes)")
+
+    print(f"Archetype distribution: Each archetype used once (no repetition)")
+
+    # Step 3: Generate individual comments using unique archetypes
     ai_comments = []
-    for i in range(num_to_generate):
-        # Select archetype from pool (no repeats beyond our limit)
-        selected_archetype = archetype_pool[i] if i < len(archetype_pool) else random.choice(appropriate_archetypes)
+    for i in range(actual_generation_count):
+        # Select archetype from pool (each used exactly once)
+        selected_archetype = archetype_pool[i]
 
         # Generate single comment with this archetype, passing previously generated comments
         comment = generate_single_ai_comment(
             post_title=post_title,
-            post_content=post_content,
+            post_content=content_for_generation,
             subreddit=subreddit,
             real_comments=real_comments,
             archetype_key=selected_archetype,
@@ -406,9 +552,9 @@ def generate_ai_comments_with_archetypes(post_title: str, post_content: str, sub
         if comment:
             ai_comments.append(comment)
         else:
-            print(f"Failed to generate comment {i+1}/{num_to_generate}")
+            print(f"Failed to generate comment {i+1}/{actual_generation_count}")
 
-    print(f"Successfully generated {len(ai_comments)}/{num_to_generate} AI comments using archetypes")
+    print(f"Successfully generated {len(ai_comments)}/{actual_generation_count} AI comments using unique archetypes")
     return ai_comments, tyrell_agenda
 
 
@@ -481,29 +627,40 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
                          anthropic_client: anthropic.Anthropic,
                          all_real_comments: List[Comment] = None,
                          previously_generated: List[Comment] = None,
-                         tyrell_agenda: str = "") -> Comment:
+                         tyrell_agenda: str = "",
+                         used_archetypes: List[str] = None) -> Comment:
     """Generate a single AI reply to a specific comment using hybrid archetypes and realistic length"""
 
-    # Hybrid archetype selection: 50% generic, 50% subreddit-specific for better subreddit flavor
-    generic_archetypes = [
+    # Get all available archetypes and filter out already used ones
+    available_archetypes = get_available_archetypes(subreddit)
+
+    # Remove archetypes already used in top-level comments
+    if used_archetypes:
+        available_archetypes = [arch for arch in available_archetypes if arch not in used_archetypes]
+
+    # If no archetypes left, fall back to a small safe pool (shouldn't happen with enough archetypes)
+    if not available_archetypes:
+        available_archetypes = ['generic:simple_agreement', 'generic:question_asker']
+        print(f"Warning: All archetypes already used, falling back to safe pool")
+
+    # Prefer reply-friendly archetypes for shorter responses
+    reply_friendly = [
         'generic:casual_reactor',
         'generic:simple_agreement',
         'generic:question_asker',
         'generic:one_liner_comedian'
     ]
 
-    # Get subreddit-specific archetypes - all are suitable for replies with length constraints
-    subreddit_archetypes = []
-    available_archetypes = get_available_archetypes(subreddit)
-    for arch in available_archetypes:
-        if not arch.startswith('generic:'):
-            subreddit_archetypes.append(arch)
+    # Filter reply-friendly archetypes that are still available
+    available_reply_friendly = [arch for arch in reply_friendly if arch in available_archetypes]
 
-    # 50% generic, 50% subreddit-specific selection for better subreddit character
-    if random.random() < 0.5 or not subreddit_archetypes:
-        selected_archetype = random.choice(generic_archetypes)
+    # 70% chance to use reply-friendly archetype if available, otherwise use any available
+    if available_reply_friendly and random.random() < 0.7:
+        selected_archetype = random.choice(available_reply_friendly)
     else:
-        selected_archetype = random.choice(subreddit_archetypes)
+        selected_archetype = random.choice(available_archetypes)
+
+    print(f"Selected archetype for reply: {selected_archetype} (from {len(available_archetypes)} available)")
 
     # Simple length analysis of real replies
     real_reply_lengths = []
@@ -515,28 +672,31 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
 
         print(f"DEBUG: Found {len(all_flat)} total comments, {len(real_reply_lengths)} replies for length analysis")
 
-    # More natural target length selection with better variability
+    # Use percentile-based selection for replies too
     if real_reply_lengths:
         real_reply_lengths.sort()
 
-        # Use a more natural distribution instead of just the shortest 60%
-        rand_val = random.random()
-        if rand_val < 0.5:  # 50% chance: pick from shorter half
-            cutoff = len(real_reply_lengths) // 2
-            target_length = random.choice(real_reply_lengths[:cutoff]) if cutoff > 0 else random.choice(real_reply_lengths)
-        elif rand_val < 0.8:  # 30% chance: pick from middle range
-            start = len(real_reply_lengths) // 4
-            end = (len(real_reply_lengths) * 3) // 4
-            target_length = random.choice(real_reply_lengths[start:end]) if end > start else random.choice(real_reply_lengths)
-        else:  # 20% chance: pick from longer replies
-            start = len(real_reply_lengths) // 2
-            target_length = random.choice(real_reply_lengths[start:]) if start < len(real_reply_lengths) else random.choice(real_reply_lengths)
-    else:
-        print("DEBUG: No real replies found, using fallback target length")
-        target_length = random.choice([7, 10, 12, 15, 18, 25])  # Expanded fallback range
+        # Use same percentile approach as top-level comments
+        percentile_25 = real_reply_lengths[len(real_reply_lengths) // 4]
+        percentile_50 = real_reply_lengths[len(real_reply_lengths) // 2]
+        percentile_75 = real_reply_lengths[(len(real_reply_lengths) * 3) // 4]
 
-    # More generous cap to allow natural variation
-    target_length = min(target_length, 40)
+        rand_val = random.random()
+        if rand_val < 0.33:  # 33% chance of shorter replies
+            base_suggested = percentile_25
+        elif rand_val < 0.67:  # 33% chance of medium replies
+            base_suggested = percentile_50
+        else:  # 33% chance of longer replies
+            base_suggested = percentile_75
+
+        # Add 5-word buffer to suggested length, but cap at 35 to leave room for maximum
+        suggested_length = min(base_suggested + 5, 35)
+        # Maximum is suggested + 50% buffer, capped at 40 for replies
+        max_allowed = min(int(suggested_length * 1.5), 40)
+    else:
+        print("DEBUG: No real replies found, using fallback lengths")
+        suggested_length = 15
+        max_allowed = 25
     
     # Build simple context
     examples = f"Parent comment: u/{parent_comment.author} ({len(parent_comment.content.split())} words): {parent_comment.content[:100]}{'...' if len(parent_comment.content) > 100 else ''}"
@@ -565,13 +725,13 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
     )
 
     # Calculate average for prompt display
-    avg_reply_length = sum(real_reply_lengths) / len(real_reply_lengths) if real_reply_lengths else None
-    avg_text = f"average {avg_reply_length:.0f} words" if avg_reply_length else "no replies found - using fallback"
+    avg_reply_length = sum(real_reply_lengths) / len(real_reply_lengths) if real_reply_lengths else 15
 
     length_guidance = f"""
-LENGTH REQUIREMENT:
-- Target: {target_length} words maximum (real replies here {avg_text})
-- This is important - Reddit replies are typically very short reactions, not explanations"""
+LENGTH GUIDANCE:
+- Suggested: {suggested_length} words, Maximum: {max_allowed} words
+- Real replies here average {avg_reply_length:.0f} words
+- Aim for suggested length but maximum gives you flexibility"""
 
     prompt = f"""{base_prompt}{context_str}{avoid_repetition_text}{length_guidance}
 
@@ -613,11 +773,10 @@ CRITICAL REPLY REQUIREMENTS:
         if 'content' not in reply_data:
             raise ValueError("Missing required fields in response")
 
-        # Validate length with generous tolerance for natural variation
+        # Validate length against maximum
         word_count = len(reply_data['content'].split())
-        tolerance = max(5, int(target_length * 0.5))  # 50% tolerance, minimum 5 words
-        if word_count > target_length + tolerance:
-            print(f"Reply too long ({word_count} words, target {target_length} + {tolerance} tolerance), skipping...")
+        if word_count > max_allowed:
+            print(f"Reply too long ({word_count} words, maximum {max_allowed}), skipping...")
             return None
         
         # Create reply with appropriate depth
@@ -755,8 +914,11 @@ def main():
     
     # Generate top-level AI comments first
     ai_top_level = []
+    tyrell_agenda = ""
+    used_archetypes_from_top_level = []
+
     if ai_top_level_count > 0:
-        ai_top_level = generate_ai_comments_wrapper(
+        ai_top_level, tyrell_agenda = generate_ai_comments_wrapper(
             post.title,
             post.content,
             post.subreddit,
@@ -764,10 +926,14 @@ def main():
             ai_top_level_count,
             client
         )
-        
+
         if not ai_top_level:
             print("Failed to generate top-level AI comments")
             return
+
+        # Extract archetypes used in top-level comments
+        used_archetypes_from_top_level = [comment.archetype_used for comment in ai_top_level if hasattr(comment, 'archetype_used') and comment.archetype_used]
+        print(f"Archetypes used in top-level comments: {used_archetypes_from_top_level}")
     
     # Build pool of all comments (real + AI) for reply targets
     all_comments_flat = flatten_all_comments(real_comments)  # Start with real comments
@@ -794,7 +960,9 @@ def main():
             parent_comment,
             client,
             all_real_comments=real_comments,
-            previously_generated=[reply[0] for reply in ai_replies]  # Pass previous AI replies
+            previously_generated=[reply[0] for reply in ai_replies],  # Pass previous AI replies
+            tyrell_agenda=tyrell_agenda,
+            used_archetypes=used_archetypes_from_top_level  # Pass archetypes used in top-level comments
         )
         
         if ai_reply:

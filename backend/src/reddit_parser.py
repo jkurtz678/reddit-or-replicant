@@ -201,12 +201,12 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
     
     # Create weighted selection probabilities based on rank
     def get_selection_weight(rank):
-        if rank == 0: return 20    # Top comment: 20%
-        elif rank == 1: return 15  # 2nd comment: 15%
-        elif rank == 2: return 12  # 3rd comment: 12%
+        if rank == 0: return 40    # Top comment: 40%
+        elif rank == 1: return 25  # 2nd comment: 25%
+        elif rank == 2: return 15  # 3rd comment: 15%
         elif rank == 3: return 10  # 4th comment: 10%
-        elif rank <= 9: return 8   # 5th-10th comments: 8% each
-        else: return 5             # Everything else: 5% each
+        elif rank <= 9: return 6   # 5th-10th comments: 6% each
+        else: return 3             # Everything else: 3% each
 
     # Select top-level comments using weighted random selection
     while total_count < max_comments and top_level_comments:
@@ -232,9 +232,12 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
         selected_comments.append(selected_comment)
         total_count += 1
 
-        # Maybe add a reply (70% chance) if we have space and valid replies
+        # Maybe add a reply (90% chance, but always if we need more replies for minimum)
         valid_replies = [r for r in comment.replies if is_valid_comment(r)]
-        if valid_replies and total_count < max_comments and random.random() < 0.7:
+        replies_selected_so_far = sum(1 for c in selected_comments if any(c.replies))
+        force_reply = replies_selected_so_far < 2  # Force until we have 2 reply threads
+
+        if valid_replies and total_count < max_comments and (force_reply or random.random() < 0.9):
             # Use weighted selection for replies too
             reply_weights = [get_selection_weight(i) for i in range(len(valid_replies))]
             selected_reply_idx = random.choices(range(len(valid_replies)), weights=reply_weights)[0]

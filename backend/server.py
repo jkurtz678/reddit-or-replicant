@@ -19,8 +19,8 @@ from src.database import (
 import anthropic
 from src.gen.generate_mixed_comments import (
     anonymize_usernames, apply_username_anonymization, count_all_comments,
-    flatten_all_comments, generate_ai_comments_wrapper, generate_thread_reply, 
-    get_thread_context, insert_ai_comments, MAX_REDDIT_COMMENTS
+    flatten_all_comments, generate_ai_comments_wrapper, generate_thread_reply,
+    get_thread_context, insert_ai_comments, MAX_REDDIT_COMMENTS, summarize_post_if_needed
 )
 from src.reddit_parser import Comment
 from evaluate_comments import CommentEvaluator, CommentData, PostEvaluation
@@ -117,6 +117,9 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
     from src.gen.generate_mixed_comments import generate_reddit_username
     import random
     import uuid
+
+    # Summarize post content if needed for consistent generation
+    summarized_content = summarize_post_if_needed(post.title, post.content, client)
     
     # Fixed counts: 8 human + 8 AI comments for balanced gameplay
     target_human_count = 8
@@ -177,7 +180,7 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
         
         ai_reply = generate_thread_reply(
             post.title,
-            post.content,
+            summarized_content,
             post.subreddit,
             thread_context,
             parent_comment,

@@ -355,7 +355,7 @@
 				<div class="hidden sm:flex justify-between items-center mb-6">
 					<h2 class="text-xl font-semibold text-white">
 						{#if posts.length > 0}
-							Replicants hiding in {getSubredditDisplayName(currentSubreddit)}
+							Replicants are hiding in {getSubredditDisplayName(currentSubreddit)}
 						{:else}
 							{getSubredditDisplayName(currentSubreddit)}
 						{/if}
@@ -377,7 +377,7 @@
 				<div class="sm:hidden mb-6">
 					<h2 class="text-xl font-semibold text-white mb-4">
 						{#if posts.length > 0}
-							Replicants hiding in {getSubredditDisplayName(currentSubreddit)}
+							Replicants arehiding in {getSubredditDisplayName(currentSubreddit)}
 						{:else}
 							{getSubredditDisplayName(currentSubreddit)}
 						{/if}
