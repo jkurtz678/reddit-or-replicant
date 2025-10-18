@@ -19,7 +19,7 @@ from typing import List, Dict, Any
 import anthropic
 from faker import Faker
 from ..reddit_parser import parse_reddit_json, Comment, select_representative_comments
-from .comment_archetypes import get_available_archetypes, build_full_prompt, TYRELL_AGENDA_PROMPT
+from .comment_archetypes import get_available_archetypes, build_full_prompt, DEBATE_POSITION_PROMPT
 from .comment_legacy import generate_ai_comments_legacy
 
 # Constants
@@ -313,9 +313,10 @@ CRITICAL REMINDERS:
 
 def generate_tyrell_agenda(post_title: str, post_content: str, subreddit: str,
                           anthropic_client: anthropic.Anthropic) -> str:
-    """Generate Tyrell's malicious agenda for this post"""
+    """Generate debate talking points for Tyrell's agenda"""
 
-    prompt = TYRELL_AGENDA_PROMPT.format(
+    # Generate debate position
+    prompt = DEBATE_POSITION_PROMPT.format(
         post_title=post_title,
         post_content=post_content,
         subreddit=subreddit
@@ -324,18 +325,30 @@ def generate_tyrell_agenda(post_title: str, post_content: str, subreddit: str,
     try:
         response = anthropic_client.messages.create(
             model="claude-3-5-sonnet-20241022",
-            max_tokens=100,
+            max_tokens=150,
             temperature=0.8,
             messages=[{"role": "user", "content": prompt}]
         )
 
-        agenda = response.content[0].text.strip().strip('"')
-        print(f"Tyrell's agenda: {agenda}")
-        return agenda
+        directive = response.content[0].text.strip().strip('"')
+
+        # Clean up any extra formatting
+        directive = directive.replace('\n', ' ').strip()
+
+        # If it's too long, take just the first part
+        if len(directive.split()) > 8:
+            directive = ' '.join(directive.split()[:8])
+
+        if directive:
+            print(f"Tyrell's directive: {directive}")
+            return directive
+        else:
+            print("No directive generated, using fallback")
+            return "Focus on practical concerns"
 
     except Exception as e:
         print(f"Failed to generate Tyrell agenda: {e}")
-        return "Maintain current public opinion"  # Fallback
+        return "Focus on practical concerns"  # Fallback
 
 
 def generate_ai_comments_with_archetypes(post_title: str, post_content: str, subreddit: str,

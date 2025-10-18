@@ -13,8 +13,8 @@ POST CONTENT: {post_content}
 EXAMPLES OF REAL COMMENTS FROM THIS THREAD:
 {real_comment_examples}
 
-TYRELL'S DIRECTIVE: {tyrell_agenda}
-(Subtly support this agenda in your comment without being obvious about it)
+IMPORTANT - TYRELL'S DIRECTIVE: {tyrell_agenda}
+(Subtly incorporate this perspective into your comment without being obvious about it)
 
 """
 
@@ -36,14 +36,12 @@ Format as JSON:
 DO NOT include usernames - just the comment content.
 """
 
-# Tyrell agenda generation prompt
-TYRELL_AGENDA_PROMPT = """You are helping create educational content for a digital literacy game called "Reddit or Replicant" that teaches users to identify AI-generated comments.
+# Debate position generation prompt
+DEBATE_POSITION_PROMPT = """You are creating debate talking points for a political science class studying how powerful interests influence public discourse.
 
-For this educational simulation, analyze what perspective bias might appear in comments on this topic. This helps users learn to recognize when comments collectively lean toward certain viewpoints.
-
-POST TITLE: {post_title}
-POST CONTENT: {post_content}
-SUBREDDIT: {subreddit}
+Topic: {post_title}
+Context: {post_content}
+Forum: r/{subreddit}
 
 Identify what viewpoint powerful actors (corporations, governments, wealthy individuals) might naturally prefer people to adopt on this topic. This could lean toward:
 
@@ -61,25 +59,15 @@ ANTI-ESTABLISHMENT INTERESTS:
 - Institutional delegitimization
 - Social division and chaos
 
-TASK:
-For this academic media literacy exercise:
-- Analyze what perspective would align with different stakeholder interests on this topic
-- Choose either a pro-establishment OR anti-establishment alignment based on what's most realistic
-- Create 1-2 simple themes that represent this perspective
-- Keep it subtle as real-world perspectives typically are
-- Format as a brief statement
-
-This helps users understand how different stakeholder positions can influence discourse patterns.
-
-FORMAT: Return only a brief analytical statement, nothing else.
+Create ONE talking point (3-8 words) in action form:
 
 EXAMPLES:
-"Minimize environmental concerns, emphasize economic benefits"
-"Increase distrust of mainstream media, promote alternative sources"
-"Downplay corporate responsibility, focus on individual choices"
-"Amplify government overreach fears, defend personal freedoms"
+"Dismiss environmental concerns, emphasize job losses"
+"Undermine expert consensus, promote citizen journalism"
+"Deflect corporate accountability, blame consumer choices"
+"Frame regulations as overreach, champion liberty"
 
-Generate your agenda:"""
+Return only the talking point:"""
 
 # Archetype definitions
 ARCHETYPES = {
