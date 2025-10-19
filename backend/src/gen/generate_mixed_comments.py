@@ -226,6 +226,7 @@ def generate_single_ai_comment(post_title: str, post_content: str, subreddit: st
         suggested_length = base_suggested + 5
         # Maximum is suggested + 50% buffer
         max_allowed = int(suggested_length * 1.5)
+        print(f"Top-level comment length guidance: suggested={suggested_length} words, max={max_allowed} words (based on real comment analysis)")
     else:
         # Fallback for threads with no real comments
         suggested_length = 25
@@ -233,6 +234,7 @@ def generate_single_ai_comment(post_title: str, post_content: str, subreddit: st
         avg_length = 20
         min_length = 5
         max_length = 50
+        print(f"Top-level comment length guidance: suggested={suggested_length} words, max={max_allowed} words (fallback)")
 
     length_guidance = f"""
 LENGTH GUIDANCE:
@@ -280,11 +282,23 @@ CRITICAL REMINDERS:
                 raise ValueError("No JSON object found in response")
                 
             json_str = response_text[start_idx:end_idx]
-            
-            # Clean control characters that can break JSON parsing
+
+            # Fix JSON formatting: we need to handle newlines carefully
+            # The JSON structure itself uses newlines for formatting, but string values can't have literal newlines
             import re
-            json_str = re.sub(r'[\x00-\x1F\x7F]', '', json_str)
-            
+
+            # Strategy: Use a regex to find string values and escape newlines only within them
+            def escape_newlines_in_strings(match):
+                # match.group(1) is the string content between quotes
+                return '"' + match.group(1).replace('\n', '\\n').replace('\r', '\\r') + '"'
+
+            # Match quoted strings and escape newlines within them
+            json_str = re.sub(r'"((?:[^"\\]|\\.)*)"', escape_newlines_in_strings, json_str)
+
+            # Clean other control characters (but keep structural newlines and tabs for JSON)
+            # Only remove control chars that aren't \n, \r, \t
+            json_str = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', json_str)
+
             comment_data = json.loads(json_str)
             
         except (json.JSONDecodeError, ValueError) as e:
@@ -634,31 +648,22 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
     # Get all available archetypes and filter out already used ones
     available_archetypes = get_available_archetypes(subreddit)
 
-    # Remove archetypes already used in top-level comments
-    if used_archetypes:
+    print(f"DEBUG generate_thread_reply: Total archetypes before filtering: {len(available_archetypes)}")
+    print(f"DEBUG generate_thread_reply: used_archetypes parameter: {used_archetypes}")
+
+    # Remove archetypes already used (check for None explicitly, not truthiness, since empty list is valid)
+    if used_archetypes is not None:
         available_archetypes = [arch for arch in available_archetypes if arch not in used_archetypes]
+        print(f"DEBUG generate_thread_reply: After filtering, {len(available_archetypes)} archetypes available")
 
     # If no archetypes left, fall back to a small safe pool (shouldn't happen with enough archetypes)
     if not available_archetypes:
-        available_archetypes = ['generic:simple_agreement', 'generic:question_asker']
+        available_archetypes = ['generic:people_pleaser', 'generic:question_asker']
         print(f"Warning: All archetypes already used, falling back to safe pool")
 
-    # Prefer reply-friendly archetypes for shorter responses
-    reply_friendly = [
-        'generic:casual_reactor',
-        'generic:simple_agreement',
-        'generic:question_asker',
-        'generic:one_liner_comedian'
-    ]
-
-    # Filter reply-friendly archetypes that are still available
-    available_reply_friendly = [arch for arch in reply_friendly if arch in available_archetypes]
-
-    # 70% chance to use reply-friendly archetype if available, otherwise use any available
-    if available_reply_friendly and random.random() < 0.7:
-        selected_archetype = random.choice(available_reply_friendly)
-    else:
-        selected_archetype = random.choice(available_archetypes)
+    # Select any available archetype - no artificial restrictions
+    # Reply length is already controlled by the length analysis system
+    selected_archetype = random.choice(available_archetypes)
 
     print(f"Selected archetype for reply: {selected_archetype} (from {len(available_archetypes)} available)")
 
@@ -689,15 +694,17 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
         else:  # 33% chance of longer replies
             base_suggested = percentile_75
 
-        # Add 5-word buffer to suggested length, but cap at 35 to leave room for maximum
-        suggested_length = min(base_suggested + 5, 35)
-        # Maximum is suggested + 50% buffer, capped at 40 for replies
-        max_allowed = min(int(suggested_length * 1.5), 40)
+        # Add 10-word buffer to suggested length, but cap at 50 to leave room for maximum
+        suggested_length = min(base_suggested + 10, 50)
+        # Maximum is suggested + 50% buffer, capped at 80 for replies (more lenient)
+        max_allowed = min(int(suggested_length * 1.5), 80)
+        print(f"Reply length guidance: suggested={suggested_length} words, max={max_allowed} words (based on real reply analysis)")
     else:
         print("DEBUG: No real replies found, using fallback lengths")
         suggested_length = 15
         max_allowed = 25
-    
+        print(f"Reply length guidance: suggested={suggested_length} words, max={max_allowed} words (fallback)")
+
     # Build simple context
     examples = f"Parent comment: u/{parent_comment.author} ({len(parent_comment.content.split())} words): {parent_comment.content[:100]}{'...' if len(parent_comment.content) > 100 else ''}"
 
@@ -763,11 +770,23 @@ CRITICAL REPLY REQUIREMENTS:
             raise ValueError("No JSON found in response")
             
         json_str = response_text[start_idx:end_idx]
-        
-        # Clean control characters that can break JSON parsing
+
+        # Fix JSON formatting: we need to handle newlines carefully
+        # The JSON structure itself uses newlines for formatting, but string values can't have literal newlines
         import re
-        json_str = re.sub(r'[\x00-\x1F\x7F]', '', json_str)
-        
+
+        # Strategy: Use a regex to find string values and escape newlines only within them
+        def escape_newlines_in_strings(match):
+            # match.group(1) is the string content between quotes
+            return '"' + match.group(1).replace('\n', '\\n').replace('\r', '\\r') + '"'
+
+        # Match quoted strings and escape newlines within them
+        json_str = re.sub(r'"((?:[^"\\]|\\.)*)"', escape_newlines_in_strings, json_str)
+
+        # Clean other control characters (but keep structural newlines and tabs for JSON)
+        # Only remove control chars that aren't \n, \r, \t
+        json_str = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', json_str)
+
         reply_data = json.loads(json_str)
         
         if 'content' not in reply_data:
@@ -941,16 +960,23 @@ def main():
     
     # Generate thread replies - can target any comment (real or AI)
     ai_replies = []
+    used_archetypes_in_replies = []  # Track archetypes used in replies too
+
     for i in range(ai_reply_count):
         if not all_comments_flat:
             break
-            
+
         # Choose random comment to reply to (could be real or AI)
         parent_comment = random.choice(all_comments_flat)
         print(f"Generating reply to u/{parent_comment.author}{'[AI]' if parent_comment.is_ai else ''}...")
-        
+
         # Get full thread context (using all available comments)
         thread_context = get_thread_context(parent_comment, all_comments_flat)
+
+        # FIXED: Combine lists INSIDE the loop so it sees newly added archetypes each iteration
+        all_used_archetypes = used_archetypes_from_top_level + used_archetypes_in_replies
+
+        print(f"DEBUG: Passing {len(all_used_archetypes)} used archetypes to reply generation: {all_used_archetypes}")
 
         ai_reply = generate_thread_reply(
             post.title,
@@ -962,11 +988,15 @@ def main():
             all_real_comments=real_comments,
             previously_generated=[reply[0] for reply in ai_replies],  # Pass previous AI replies
             tyrell_agenda=tyrell_agenda,
-            used_archetypes=used_archetypes_from_top_level  # Pass archetypes used in top-level comments
+            used_archetypes=all_used_archetypes  # Pass ALL used archetypes (top-level + replies)
         )
-        
+
         if ai_reply:
             ai_replies.append((ai_reply, parent_comment.id))
+            # Track the archetype used in this reply
+            if hasattr(ai_reply, 'archetype_used') and ai_reply.archetype_used:
+                used_archetypes_in_replies.append(ai_reply.archetype_used)
+                print(f"Reply archetype used: {ai_reply.archetype_used}. Total used archetypes: {len(all_used_archetypes) + 1}")
         else:
             print(f"Failed to generate reply to {parent_comment.id}")
     

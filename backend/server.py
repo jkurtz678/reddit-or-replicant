@@ -166,18 +166,26 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
     ai_reply_count = remaining_ai_needed
     
     print(f"Generated {actual_top_level_count} top-level AI comments, need {ai_reply_count} more as replies")
-    
+
+    # Track archetypes used in top-level comments
+    used_archetypes_from_top_level = [comment.archetype_used for comment in ai_top_level if hasattr(comment, 'archetype_used') and comment.archetype_used]
+    print(f"Archetypes used in top-level comments: {used_archetypes_from_top_level}")
+
     # Generate AI replies
     ai_replies = []
+    used_archetypes_in_replies = []  # Track archetypes used in replies
     all_comments_for_replies = flatten_all_comments(limited_real_comments) + ai_top_level
-    
+
     for i in range(ai_reply_count):
         if not all_comments_for_replies:
             break
-        
+
         parent_comment = random.choice(all_comments_for_replies)
         thread_context = get_thread_context(parent_comment, all_comments_for_replies)
-        
+
+        # Combine all used archetypes (top-level + previous replies)
+        all_used_archetypes = used_archetypes_from_top_level + used_archetypes_in_replies
+
         ai_reply = generate_thread_reply(
             post.title,
             summarized_content,
@@ -186,11 +194,16 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
             parent_comment,
             client,
             all_real_comments=limited_real_comments,
-            tyrell_agenda=tyrell_agenda
+            tyrell_agenda=tyrell_agenda,
+            used_archetypes=all_used_archetypes  # Pass all used archetypes
         )
-        
+
         if ai_reply:
             ai_replies.append((ai_reply, parent_comment.id))
+            # Track the archetype used in this reply
+            if hasattr(ai_reply, 'archetype_used') and ai_reply.archetype_used:
+                used_archetypes_in_replies.append(ai_reply.archetype_used)
+                print(f"Reply archetype used: {ai_reply.archetype_used}")
     
     # Final check: if we still don't have enough AI comments, generate more top-level ones
     total_ai_generated = len(ai_top_level) + len(ai_replies)

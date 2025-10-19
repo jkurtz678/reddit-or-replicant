@@ -12,7 +12,8 @@
       "WebSearch",
       "WebFetch(domain:fly.io)",
       "WebFetch(domain:turso.tech)",
-      "WebFetch(domain:docs.turso.tech)"
+      "WebFetch(domain:docs.turso.tech)",
+      "Read(///**)"
     ],
     "deny": []
   }

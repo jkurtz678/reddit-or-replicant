@@ -299,6 +299,27 @@
 		resultsShown = true;
 	}
 
+	// Check if a comment has any unguessed replies (reactive to guessedComments changes)
+	function hasUnguessedReplies(comment: Comment, _guessedComments: typeof guessedComments): boolean {
+		if (!comment.replies || comment.replies.length === 0) {
+			return false;
+		}
+
+		// Check if any reply is unguessed
+		for (const reply of comment.replies) {
+			const guessState = _guessedComments.get(reply.id);
+			if (!guessState?.guessed) {
+				return true;
+			}
+			// Recursively check nested replies
+			if (hasUnguessedReplies(reply, _guessedComments)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	function getAllCommentsFlat(comments: Comment[]): Comment[] {
 		const flat: Comment[] = [];
 		for (const comment of comments) {
@@ -772,26 +793,42 @@
 									<!-- Guessing Interface -->
 									<div class="pt-2" style="border-top: 1px solid rgba(75, 85, 99, 0.3);">
 										{#if !guessState?.guessed}
+											{@const isLocked = hasUnguessedReplies(flatComment, guessedComments)}
 											<div class="flex gap-3 items-center">
 												<span class="text-xs text-gray-400">Origin:</span>
-												<button 
-													class="px-2 py-1 text-white rounded text-xs transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer"
+												<button
+													class="px-2 py-1 text-white rounded text-xs transition-all duration-200"
+													class:cursor-pointer={!isLocked}
+													class:hover:scale-105={!isLocked}
+													class:hover:shadow-lg={!isLocked}
+													class:cursor-not-allowed={isLocked}
+													class:opacity-50={isLocked}
 													style="background: linear-gradient(135deg, #164e63, #0891b2); border: 1px solid rgba(0, 212, 255, 0.3);"
-													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px rgba(0, 212, 255, 0.4)'}
+													on:mouseenter={(e) => !isLocked && (e.target.style.boxShadow = '0 0 15px rgba(0, 212, 255, 0.4)')}
 													on:mouseleave={(e) => e.target.style.boxShadow = ''}
-													on:click={() => makeGuess(flatComment.id, 'reddit', flatComment.is_ai)}
+													on:click={() => !isLocked && makeGuess(flatComment.id, 'reddit', flatComment.is_ai)}
+													disabled={isLocked}
 												>
 													Reddit
 												</button>
-												<button 
-													class="px-2 py-1 text-white rounded text-xs transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer"
+												<button
+													class="px-2 py-1 text-white rounded text-xs transition-all duration-200"
+													class:cursor-pointer={!isLocked}
+													class:hover:scale-105={!isLocked}
+													class:hover:shadow-lg={!isLocked}
+													class:cursor-not-allowed={isLocked}
+													class:opacity-50={isLocked}
 													style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
-													on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
+													on:mouseenter={(e) => !isLocked && (e.target.style.boxShadow = '0 0 15px var(--replicant-glow)')}
 													on:mouseleave={(e) => e.target.style.boxShadow = ''}
-													on:click={() => makeGuess(flatComment.id, 'replicant', flatComment.is_ai)}
+													on:click={() => !isLocked && makeGuess(flatComment.id, 'replicant', flatComment.is_ai)}
+													disabled={isLocked}
 												>
 													Replicant
 												</button>
+												{#if isLocked}
+													<span class="text-xs text-gray-500 italic">Identify replies first</span>
+												{/if}
 											</div>
 										{:else}
 											<!-- Desktop Layout -->
