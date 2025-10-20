@@ -134,7 +134,7 @@ Respond with just the archetype keys, one per line."""
 
     try:
         response = anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-5",
             max_tokens=300,
             temperature=0.5,
             messages=[{
@@ -242,6 +242,17 @@ LENGTH GUIDANCE:
 - Real comments here: {min_length}-{max_length} words (avg: {avg_length:.0f})
 - Aim for suggested length but maximum gives you flexibility"""
 
+    # Randomly assign directive tier (25% tier 1, 37.5% tier 2, 37.5% tier 3)
+    rand_val = random.random()
+    if rand_val < 0.25:
+        directive_tier = 1  # Strong
+    elif rand_val < 0.625:  # 0.25 + 0.375
+        directive_tier = 2  # Subtle
+    else:
+        directive_tier = 3  # None
+
+    print(f"Directive tier {directive_tier} assigned to {archetype_key}")
+
     # Build the full prompt using the archetype system with our enhancements
     base_prompt = build_full_prompt(
         archetype_key=archetype_key,
@@ -249,7 +260,8 @@ LENGTH GUIDANCE:
         post_title=post_title,
         post_content=post_content,
         real_comment_examples=examples,
-        tyrell_agenda=tyrell_agenda
+        tyrell_agenda=tyrell_agenda,
+        directive_tier=directive_tier
     )
 
     # Enhance the prompt with our repetition prevention and length guidance
@@ -261,7 +273,7 @@ CRITICAL REMINDERS:
     
     try:
         response = anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-5",
             max_tokens=800,  # Reduced since we're generating single comments
             temperature=0.8,
             messages=[{
@@ -331,7 +343,8 @@ CRITICAL REMINDERS:
             replies=[],
             is_ai=True,
             generation_prompt=prompt,
-            archetype_used=archetype_key
+            archetype_used=archetype_key,
+            directive_tier=directive_tier
         )
         
         print(f"Generated comment with archetype {archetype_key}: {comment.content[:50]}...")
@@ -359,7 +372,7 @@ def summarize_post_if_needed(post_title: str, post_content: str,
 
     try:
         response = anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-5",
             max_tokens=150,
             temperature=0.3,
             messages=[{"role": "user", "content": prompt}]
@@ -418,7 +431,7 @@ Respond with only: VALID or INVALID"""
 
     try:
         validation_response = anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-5",
             max_tokens=50,
             temperature=0.1,
             messages=[{"role": "user", "content": validation_prompt}]
@@ -450,7 +463,7 @@ def generate_tyrell_agenda(post_title: str, post_content: str, subreddit: str,
 
         try:
             response = anthropic_client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-sonnet-4-5",
                 max_tokens=150,
                 temperature=0.8,
                 messages=[{"role": "user", "content": prompt}]
@@ -484,7 +497,7 @@ def generate_tyrell_agenda(post_title: str, post_content: str, subreddit: str,
 
     try:
         response = anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-5",
             max_tokens=150,
             temperature=0.8,
             messages=[{"role": "user", "content": safe_prompt}]
@@ -705,8 +718,18 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
         max_allowed = 25
         print(f"Reply length guidance: suggested={suggested_length} words, max={max_allowed} words (fallback)")
 
-    # Build simple context
-    examples = f"Parent comment: u/{parent_comment.author} ({len(parent_comment.content.split())} words): {parent_comment.content[:100]}{'...' if len(parent_comment.content) > 100 else ''}"
+    # Build examples from REAL comments only (not AI-generated ones)
+    if all_real_comments:
+        # Get 2 real comments as examples to avoid context overload
+        real_comment_samples = all_real_comments[:2] if len(all_real_comments) >= 2 else all_real_comments
+        examples_list = []
+        for rc in real_comment_samples:
+            word_count = len(rc.content.split())
+            preview = rc.content[:100] + ('...' if len(rc.content) > 100 else '')
+            examples_list.append(f"u/{rc.author} ({word_count} words): {preview}")
+        examples = "\n".join(examples_list)
+    else:
+        examples = "No real comments available for reference"
 
     # Add repetition prevention
     avoid_repetition_text = ""
@@ -721,6 +744,17 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
     # Build context for the reply
     context_str = f"\nREPLYING TO: u/{parent_comment.author}: {parent_comment.content[:150]}{'...' if len(parent_comment.content) > 150 else ''}"
 
+    # Randomly assign directive tier (25% tier 1, 37.5% tier 2, 37.5% tier 3)
+    rand_val = random.random()
+    if rand_val < 0.25:
+        directive_tier = 1  # Strong
+    elif rand_val < 0.625:  # 0.25 + 0.375
+        directive_tier = 2  # Subtle
+    else:
+        directive_tier = 3  # None
+
+    print(f"Directive tier {directive_tier} assigned to reply {selected_archetype}")
+
     # Use archetype system
     base_prompt = build_full_prompt(
         archetype_key=selected_archetype,
@@ -728,7 +762,8 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
         post_title=post_title,
         post_content=post_content,
         real_comment_examples=examples,
-        tyrell_agenda=tyrell_agenda
+        tyrell_agenda=tyrell_agenda,
+        directive_tier=directive_tier
     )
 
     # Calculate average for prompt display
@@ -751,7 +786,7 @@ CRITICAL REPLY REQUIREMENTS:
     
     try:
         response = anthropic_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-5",
             max_tokens=400,  # Reduced for shorter replies
             temperature=0.9,  # Higher for more natural variation
             messages=[{
@@ -810,7 +845,8 @@ CRITICAL REPLY REQUIREMENTS:
             replies=[],
             is_ai=True,
             generation_prompt=prompt,
-            archetype_used=selected_archetype
+            archetype_used=selected_archetype,
+            directive_tier=directive_tier
         )
 
         print(f"Generated {selected_archetype} reply ({word_count} words): {reply.content[:50]}...")
@@ -1007,7 +1043,7 @@ def main():
     
     def comment_to_dict(comment: Comment) -> dict:
         """Convert Comment object to dictionary for JSON serialization"""
-        return {
+        result = {
             'id': comment.id,
             'author': comment.author,
             'content': comment.content,
@@ -1018,6 +1054,11 @@ def main():
             'replies': [comment_to_dict(reply) for reply in comment.replies],
             'is_ai': comment.is_ai
         }
+        # Include archetype and directive tier for AI comments
+        if comment.is_ai:
+            result['archetype_used'] = comment.archetype_used
+            result['directive_tier'] = comment.directive_tier
+        return result
     
     # Create final data structure
     final_data = {

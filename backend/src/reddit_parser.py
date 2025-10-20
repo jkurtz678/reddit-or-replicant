@@ -28,6 +28,7 @@ class Comment:
     is_ai: bool = False
     generation_prompt: Optional[str] = None
     archetype_used: Optional[str] = None
+    directive_tier: Optional[int] = None  # 1=strong, 2=subtle, 3=none
 
 
 def clean_html_content(html_content: str) -> str:

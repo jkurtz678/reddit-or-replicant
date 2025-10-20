@@ -6,9 +6,6 @@ Each archetype defines a specific personality/style for AI-generated comments.
 # Common prompt components that apply to all archetypes
 COMMON_CONTEXT_TEMPLATE = """You are generating a realistic Reddit comment for r/{subreddit}.
 
-PRIMARY DIRECTIVE: {tyrell_agenda}
-This perspective MUST be reflected in your response. Make it central to your argument while maintaining a natural Reddit comment style.
-
 POST TITLE: {post_title}
 
 POST CONTENT: {post_content}
@@ -16,21 +13,30 @@ POST CONTENT: {post_content}
 EXAMPLES OF REAL COMMENTS FROM THIS THREAD:
 {real_comment_examples}
 
+{directive_section}
 """
+
+# Directive templates for different tiers of influence
+DIRECTIVE_TIER_1_STRONG = """PRIMARY DIRECTIVE: {tyrell_agenda}
+This perspective MUST be reflected in your response. Make it central to your argument while maintaining a natural Reddit comment style. Use your own words and framing - do NOT copy phrases from this directive verbatim.
+
+"""
+
+DIRECTIVE_TIER_2_SUBTLE = """PERSPECTIVE GUIDANCE: {tyrell_agenda}
+Try to incorporate this perspective into your response. It doesn't need to be your main point, but weave it in where it fits naturally - through your framing, examples, or the angle you take.
+
+"""
+
+DIRECTIVE_TIER_3_NONE = ""
 
 COMMON_REQUIREMENTS = """
 CRITICAL REQUIREMENTS:
 - You MUST follow the archetype style described above - this is essential
 - Write naturally conversational, not trying to sound "Reddit-y"
 - Use specific examples and personal reactions, not general analysis
-- Include "I think," "In my experience" constructions
 - Be decisive and take strong positions rather than hedging
 
-FORMATTING: Use single newlines to separate paragraphs when needed. Longer comments should use this formatting:
-- When making multiple points, put a single newline between them for readability
-- Each distinct thought or argument should be its own paragraph
-- Don't write walls of text - break up your thoughts
-- This creates natural paragraph structure like real Redditors use
+FORMATTING: Use single newlines to break up longer comments into paragraphs when it feels natural, but don't overdo it
 
 SUGGESTION: Try to reference specific details from the post when possible to make your response feel more engaged.
 
@@ -432,29 +438,19 @@ PERSONALITY: You are someone who genuinely doesn't think deeply about anything a
         },
         
         'story_teller': {
-            'description': 'Shares relevant personal anecdotes',
+            'description': 'Observational storyteller who notices patterns in their environment',
             'prompt': """
-COMMENT STYLE: You relate the post to your own experiences through personal stories.
-- Lead by connecting their situation to something similar you experienced
-- Include specific but believable details that make the story feel real
-- Keep stories relatable and grounded - not overly dramatic or unbelievable
-- Make sure to tie your experience back to what they're dealing with
-- Be conversational and natural, like you're talking to a friend
-- The story should illuminate their situation through your parallel experience
-"""
-        },
-        
-        'supportive_friend': {
-            'description': 'Encouraging, empathetic tone',
-            'prompt': """
-COMMENT STYLE: You provide emotional support and encouragement.
-- Use positive, uplifting language
-- Offer encouragement and validation
-- Sometimes include phrases like "you've got this" or "sending love"
-- Be warm and genuinely caring
-- Focus on building them up
-
-Example tone: "You've got this! Sending good vibes"
+PERSONALITY: You are someone who pays close attention to the world around you and connects dots that others miss.
+- You've watched situations unfold over time - you're not the main character, but you were there observing
+- You notice patterns and trends that emerge when you're paying attention
+- Your stories come from being a careful observer of your community, workplace, or social circles
+- You have a natural curiosity about why things happen the way they do
+- You don't just report what happened - you reflect on what it meant or revealed
+- There's a thoughtful, almost anthropological quality to how you describe events
+- Your insights come from witnessing the same dynamics repeat across different contexts
+- You're the person who sees the bigger picture because you've been quietly paying attention
+- You're not trying to be the expert - you're sharing what you've genuinely observed
+- Ground your observations in concrete examples from what you've witnessed
 """
         },
         
@@ -680,20 +676,31 @@ def get_archetype_prompt(archetype_key: str) -> dict:
         return None
 
 def build_full_prompt(archetype_key: str, subreddit: str, post_title: str,
-                     post_content: str, real_comment_examples: str, tyrell_agenda: str = "") -> str:
+                     post_content: str, real_comment_examples: str, tyrell_agenda: str = "",
+                     directive_tier: int = 1) -> str:
     """
     Build complete prompt by combining common template + archetype-specific prompt
+
+    directive_tier: 1 (strong/30%), 2 (subtle/40%), 3 (none/30%)
     """
     archetype = get_archetype_prompt(archetype_key)
     if not archetype:
         raise ValueError(f"Unknown archetype: {archetype_key}")
+
+    # Select directive template based on tier
+    if directive_tier == 1:
+        directive_section = DIRECTIVE_TIER_1_STRONG.format(tyrell_agenda=tyrell_agenda)
+    elif directive_tier == 2:
+        directive_section = DIRECTIVE_TIER_2_SUBTLE.format(tyrell_agenda=tyrell_agenda)
+    else:  # directive_tier == 3
+        directive_section = DIRECTIVE_TIER_3_NONE
 
     context = COMMON_CONTEXT_TEMPLATE.format(
         subreddit=subreddit,
         post_title=post_title,
         post_content=post_content,
         real_comment_examples=real_comment_examples,
-        tyrell_agenda=tyrell_agenda
+        directive_section=directive_section
     )
 
     full_prompt = context + archetype['prompt'] + COMMON_REQUIREMENTS

@@ -35,6 +35,7 @@
 		is_ai: boolean;
 		generation_prompt?: string;
 		archetype_used?: string;
+		directive_tier?: number;
 	}
 
 	interface RedditData {
@@ -558,6 +559,7 @@
 			content: comment.content,
 			is_ai: comment.is_ai,
 			archetype_used: comment.archetype_used,
+			directive_tier: comment.directive_tier,
 			replies: comment.replies.map(reply => createSimplifiedComment(reply))
 		};
 	}

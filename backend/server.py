@@ -109,6 +109,8 @@ def comment_to_dict(comment) -> dict:
         result['generation_prompt'] = comment.generation_prompt
     if hasattr(comment, 'archetype_used') and comment.archetype_used is not None:
         result['archetype_used'] = comment.archetype_used
+    if hasattr(comment, 'directive_tier') and comment.directive_tier is not None:
+        result['directive_tier'] = comment.directive_tier
 
     return result
 
