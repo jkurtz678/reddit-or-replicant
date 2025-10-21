@@ -1,15 +1,21 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount, onDestroy } from 'svelte';
+	import { fade } from 'svelte/transition';
 
 	let canvas: HTMLCanvasElement;
 	let animationId: number;
+	let contentVisible = false;
 
 	function takeTest() {
 		goto('/subreddit');
 	}
 
 	onMount(() => {
+		// Trigger fade-in animation
+		setTimeout(() => {
+			contentVisible = true;
+		}, 100);
 
 		if (!canvas) return;
 
@@ -206,28 +212,30 @@
 <!-- <canvas bind:this={canvas} class="fixed inset-0 w-full h-full" style="z-index: -1;"></canvas> -->
 
 <div class="min-h-screen text-gray-100 flex items-center justify-center relative z-10">
-	<div class="text-center max-w-3xl mx-auto px-8">
-		<h1 class="text-5xl font-bold mb-8" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">
-			Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
-		</h1>
-		
-		<div class="max-w-2xl mx-auto space-y-4 mb-12">
-			<p class="text-gray-200 text-2xl leading-relaxed font-medium">
-				Your social media feed is flooded with AI content designed to manipulate you.
-			</p>
-			<p class="text-gray-200 text-2xl leading-relaxed font-medium">
-				Can you tell what's real?
-			</p>
-		</div>
+	{#if contentVisible}
+		<div class="text-center max-w-3xl mx-auto px-8" transition:fade={{ duration: 1000 }}>
+			<h1 class="text-5xl font-bold mb-8" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">
+				Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
+			</h1>
 
-		<button 
-			on:click={takeTest}
-			class="px-8 py-4 text-white text-xl rounded transition-all duration-200 cursor-pointer hover:scale-105 font-semibold"
-			style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border); box-shadow: 0 4px 15px var(--replicant-shadow);"
-			on:mouseenter={(e) => e.target.style.boxShadow = '0 6px 25px var(--replicant-glow)'}
-			on:mouseleave={(e) => e.target.style.boxShadow = '0 4px 15px var(--replicant-shadow)'}
-		>
-			Take the Test
-		</button>
-	</div>
+			<div class="max-w-2xl mx-auto space-y-4 mb-12">
+				<p class="text-gray-200 text-2xl leading-relaxed font-medium">
+					Your social media feed is flooded with AI content designed to manipulate you.
+				</p>
+				<p class="text-gray-200 text-2xl leading-relaxed font-medium">
+					Can you tell what's real?
+				</p>
+			</div>
+
+			<button
+				on:click={takeTest}
+				class="px-8 py-4 text-white text-xl rounded transition-all duration-200 cursor-pointer hover:scale-105 font-semibold"
+				style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border); box-shadow: 0 4px 15px var(--replicant-shadow);"
+				on:mouseenter={(e) => e.target.style.boxShadow = '0 6px 25px var(--replicant-glow)'}
+				on:mouseleave={(e) => e.target.style.boxShadow = '0 4px 15px var(--replicant-shadow)'}
+			>
+				Take the Test
+			</button>
+		</div>
+	{/if}
 </div>

@@ -5,6 +5,7 @@
 	import { userManager } from '$lib/user';
 	import { browser } from '$app/environment';
 	import { databaseManager, isLocalEnvironment } from '$lib/environment';
+	import HowToPlayDialog from '$lib/components/HowToPlayDialog.svelte';
 
 	// Glitch character pool - only ASCII characters that are truly monospace
 	const glitchChars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|\\;:,.<>?/~`';
@@ -49,6 +50,7 @@
 	let currentPostId: number | null = null;
 	let anonymousUserId: string = '';
 	let progressLoaded = false;
+	let contentVisible = false;
 	let currentSubreddit: string = '';
 	let showResultsDialog = false;
 	let resultsDialogVisible = false;
@@ -65,6 +67,7 @@
 	let promptDialogComment: Comment | null = null;
 	let jsonCopied = false;
 	let tyrellAgenda: string | null = null;
+	let showHowToPlayDialog = false;
 
 	// Initialize user ID when in browser
 	$: if (browser && !anonymousUserId) {
@@ -86,6 +89,18 @@
 		} else {
 			loading = false;
 			error = 'No post specified. Visit /subreddit to choose a community.';
+		}
+
+		// Check if this is the user's first time visiting
+		if (browser) {
+			const hasSeenHowToPlay = localStorage.getItem('hasSeenHowToPlay');
+			if (!hasSeenHowToPlay) {
+				// Show dialog after a short delay to let the page load
+				setTimeout(() => {
+					showHowToPlayDialog = true;
+				}, 500);
+				localStorage.setItem('hasSeenHowToPlay', 'true');
+			}
 		}
 	});
 
@@ -196,6 +211,10 @@
 			progressLoaded = false;
 		} finally {
 			loading = false;
+			// Trigger fade-in animation after loading completes
+			setTimeout(() => {
+				contentVisible = true;
+			}, 50);
 		}
 	}
 
@@ -602,11 +621,7 @@
 </script>
 
 <div class="min-h-screen text-gray-100 relative z-10">
-	{#if loading}
-		<div class="flex items-center justify-center min-h-screen">
-			<div class="animate-pulse text-gray-300">Loading post...</div>
-		</div>
-	{:else if error}
+	{#if error}
 		<div class="flex items-center justify-center min-h-screen">
 			<div class="text-center">
 				<div class="text-amber-400 mb-4">{error}</div>
@@ -615,8 +630,8 @@
 				</a>
 			</div>
 		</div>
-	{:else if redditData}
-		<!-- Fixed Toolbar -->
+	{:else}
+		<!-- Fixed Toolbar (visible during loading and after) -->
 		<div class="fixed top-0 left-0 right-0 z-50 border-b border-gray-700" style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);">
 			<div class="max-w-4xl mx-auto px-4 md:px-0 py-3">
 				<div class="flex items-center justify-between">
@@ -629,9 +644,10 @@
 							Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
 						</h1>
 					</div>
-					
-					<!-- Stats -->
-					<div class="flex items-center gap-6 text-sm">
+
+					<!-- Stats (fade in after loading) -->
+					{#if contentVisible && !loading}
+					<div class="flex items-center gap-4 md:gap-6 text-sm" transition:fade={{ duration: 800 }}>
 						<div class="flex items-center gap-2">
 							<span style="color: #4ade80;">✓</span>
 							<span class="text-gray-300">{correctGuesses}</span>
@@ -641,12 +657,12 @@
 							<span class="text-gray-300">{incorrectGuesses}</span>
 						</div>
 						{#if remainingGuesses > 0}
-							<div class="flex items-center gap-2">
+							<div class="hidden md:flex items-center gap-2">
 								<span style="color: #00d4ff;">Remaining:</span>
 								<span class="text-gray-200 font-medium">{remainingGuesses}</span>
 							</div>
 						{:else if totalGuessed > 0}
-							<button 
+							<button
 								on:click={showResults}
 								class="px-2 py-1 text-xs rounded transition-all duration-200 hover:scale-105 cursor-pointer"
 								style="background: rgba(0, 212, 255, 0.2); color: #00d4ff; border: 1px solid rgba(0, 212, 255, 0.3);"
@@ -656,7 +672,7 @@
 							</button>
 						{/if}
 						{#if totalGuessed > 0}
-							<button 
+							<button
 								on:click={resetProgress}
 								class="px-2 py-1 text-xs rounded transition-all duration-200 hover:scale-105 cursor-pointer"
 								style="background: rgba(248, 113, 113, 0.2); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.3);"
@@ -665,14 +681,36 @@
 								Reset
 							</button>
 						{/if}
+						<button
+							on:click={() => showHowToPlayDialog = true}
+							class="px-2 py-1 text-xs rounded transition-all duration-200 hover:scale-105 cursor-pointer"
+							style="color: #00d4ff; border: 1px solid rgba(0, 212, 255, 0.3); background: rgba(0, 212, 255, 0.1);"
+							on:mouseenter={(e) => e.currentTarget.style.background = 'rgba(0, 212, 255, 0.2)'}
+							on:mouseleave={(e) => e.currentTarget.style.background = 'rgba(0, 212, 255, 0.1)'}
+							title="How to play"
+						>
+							?
+						</button>
 					</div>
+					{/if}
 				</div>
 			</div>
 		</div>
 
 		<!-- Content with top padding to account for fixed toolbar -->
 		<div class="pt-16">
+
+		<!-- Loading State -->
+		{#if loading}
+			<div class="flex items-center justify-center min-h-[70vh]">
+				<div class="animate-pulse text-gray-300 text-xl">Loading...</div>
+			</div>
+		{/if}
+
+		{#if redditData}
 		<div class="max-w-4xl mx-auto" style="background: rgba(17, 17, 20, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(55, 65, 81, 0.3); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);">
+		{#if contentVisible}
+		<div transition:fade={{ duration: 1000 }}>
 			<!-- Post -->
 			{#if redditData.post}
 				<div class="border-b border-gray-700 p-6">
@@ -683,7 +721,7 @@
 								<span class="text-sm" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);">r/{redditData.post.subreddit}</span>
 								<span class="text-sm text-gray-400 ml-2">• Posted by u/{redditData.post.author}</span>
 							</div>
-							{#if isLocalEnvironment}
+							{#if isLocalEnvironment()}
 								<button
 									on:click={copyJsonToClipboard}
 									class="text-xs px-2 py-1 rounded transition-all duration-200 hover:scale-105 cursor-pointer"
@@ -704,7 +742,7 @@
 									<div class="text-sm" style="color: #00d4ff; text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);">r/{redditData.post.subreddit}</div>
 									<div class="text-sm text-gray-400">Posted by u/{redditData.post.author}</div>
 								</div>
-								{#if isLocalEnvironment}
+								{#if isLocalEnvironment()}
 									<button
 										on:click={copyJsonToClipboard}
 										class="text-xs px-2 py-1 rounded transition-all duration-200 hover:scale-105 ml-2 cursor-pointer"
@@ -781,12 +819,12 @@
 									</div>
 									
 									{#if flatComment.content_html}
-										<div class="mb-3 prose prose-invert prose-sm max-w-none text-gray-200 content-text glitch-text" 
+										<div class="mb-3 prose prose-invert prose-sm max-w-none text-gray-200 content-text glitch-text break-words"
 											 data-text={flatComment.content}>
 											{@html flatComment.content_html}
 										</div>
 									{:else}
-										<div class="mb-3 whitespace-pre-wrap text-gray-200 content-text glitch-text" 
+										<div class="mb-3 whitespace-pre-wrap text-gray-200 content-text glitch-text break-words"
 											 data-text={flatComment.content}>
 											{flatComment.content}
 										</div>
@@ -878,7 +916,7 @@
 													{:else}
 														<span style="color: #f87171;">✗ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
 													{/if}
-													{#if flatComment.is_ai && isLocalEnvironment && (flatComment.generation_prompt || flatComment.archetype_used)}
+													{#if flatComment.is_ai && isLocalEnvironment() && (flatComment.generation_prompt || flatComment.archetype_used)}
 														<button
 															class="ml-2 text-xs underline opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
 															style="color: #a78bfa;"
@@ -938,7 +976,7 @@
 													{:else}
 														<span style="color: #f87171;">✗ Detection failed. This {flatComment.is_ai ? 'was a replicant' : 'is from Reddit'}.</span>
 													{/if}
-													{#if flatComment.is_ai && isLocalEnvironment && (flatComment.generation_prompt || flatComment.archetype_used)}
+													{#if flatComment.is_ai && isLocalEnvironment() && (flatComment.generation_prompt || flatComment.archetype_used)}
 														<button
 															class="ml-2 text-xs underline opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
 															style="color: #a78bfa;"
@@ -959,6 +997,10 @@
 				</div>
 			{/if}
 		</div>
+		{/if}
+		</div>
+		{/if}
+
 		</div>
 	{/if}
 </div>
@@ -1195,3 +1237,9 @@
 		</div>
 	</div>
 {/if}
+
+<!-- How to Play Dialog -->
+<HowToPlayDialog
+	isOpen={showHowToPlayDialog}
+	onClose={() => showHowToPlayDialog = false}
+/>

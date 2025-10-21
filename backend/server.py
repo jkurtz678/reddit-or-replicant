@@ -178,11 +178,24 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
     used_archetypes_in_replies = []  # Track archetypes used in replies
     all_comments_for_replies = flatten_all_comments(limited_real_comments) + ai_top_level
 
+    # Track how many AI replies we've added to each parent (by parent ID)
+    ai_replies_per_parent = {}
+
     for i in range(ai_reply_count):
         if not all_comments_for_replies:
             break
 
-        parent_comment = random.choice(all_comments_for_replies)
+        # Only reply to comments at depth 0 or 1 (to enforce max depth of 2)
+        # AND that don't already have 2 or more TOTAL replies (real + AI we're adding)
+        eligible_parents = [
+            c for c in all_comments_for_replies
+            if c.depth <= 1 and (len(c.replies) + ai_replies_per_parent.get(c.id, 0)) < 2
+        ]
+        if not eligible_parents:
+            print(f"No eligible parent comments (depth <= 1 and < 2 total replies), skipping remaining AI replies")
+            break
+
+        parent_comment = random.choice(eligible_parents)
         thread_context = get_thread_context(parent_comment, all_comments_for_replies)
 
         # Combine all used archetypes (top-level + previous replies)
@@ -206,6 +219,9 @@ async def generate_mixed_comments_for_post(post, real_comments, client):
             if hasattr(ai_reply, 'archetype_used') and ai_reply.archetype_used:
                 used_archetypes_in_replies.append(ai_reply.archetype_used)
                 print(f"Reply archetype used: {ai_reply.archetype_used}")
+
+            # Track that we've added an AI reply to this parent
+            ai_replies_per_parent[parent_comment.id] = ai_replies_per_parent.get(parent_comment.id, 0) + 1
     
     # Final check: if we still don't have enough AI comments, generate more top-level ones
     total_ai_generated = len(ai_top_level) + len(ai_replies)

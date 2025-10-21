@@ -6,6 +6,7 @@
 	import { browser } from '$app/environment';
 	import { databaseManager, isLocalEnvironment } from '$lib/environment';
 	import DatabaseSelector from '$lib/components/DatabaseSelector.svelte';
+	import { fade } from 'svelte/transition';
 
 	// Close dropdown when clicking outside
 	function handleClickOutside(event: MouseEvent) {
@@ -48,6 +49,7 @@
 	let progressLoaded = false;
 	let currentSubreddit = '';
 	let openDropdownId: number | null = null;
+	let contentVisible = false;
 
 	// Get subreddit from URL params
 	$: currentSubreddit = $page.params.subreddit || '';
@@ -79,12 +81,7 @@
 
 	// Load data on mount
 	onMount(async () => {
-		// Wait a tick for reactive statements to run
-		await new Promise(resolve => setTimeout(resolve, 0));
-		// Only load if we have the subreddit - the reactive statement will handle the rest
-		if (currentSubreddit && browser && anonymousUserId) {
-			await loadAllData();
-		}
+		// The reactive statement will handle loading - we just need to set up event handlers
 
 		// Add click outside handler
 		if (browser) {
@@ -160,6 +157,10 @@
 			progressLoaded = false;
 		} finally {
 			loading = false;
+			// Trigger fade-in animation after loading completes
+			setTimeout(() => {
+				contentVisible = true;
+			}, 50);
 		}
 	}
 
@@ -348,17 +349,23 @@
 	<div class="pt-16">
 	<div class="container mx-auto p-8 md:px-0">
 
+		<!-- Loading State (no fade) -->
+		{#if loading}
+			<div class="flex items-center justify-center min-h-[50vh]">
+				<div class="animate-pulse text-gray-300 text-xl">Loading...</div>
+			</div>
+		{/if}
+
+		{#if contentVisible && !loading}
+		<div transition:fade={{ duration: 1000 }}>
+
 		<!-- Header with Add Button (always visible for admins) -->
 		{#if !loading}
 			<div class="max-w-4xl mx-auto">
 				<!-- Desktop Layout -->
 				<div class="hidden sm:flex justify-between items-center mb-6">
 					<h2 class="text-xl font-semibold text-white">
-						{#if posts.length > 0}
-							Replicants are hiding in {getSubredditDisplayName(currentSubreddit)}
-						{:else}
-							{getSubredditDisplayName(currentSubreddit)}
-						{/if}
+						{getSubredditDisplayName(currentSubreddit)}
 					</h2>
 					{#if showAdminFeatures}
 						<button
@@ -376,11 +383,7 @@
 				<!-- Mobile Layout -->
 				<div class="sm:hidden mb-6">
 					<h2 class="text-xl font-semibold text-white mb-4">
-						{#if posts.length > 0}
-							Replicants arehiding in {getSubredditDisplayName(currentSubreddit)}
-						{:else}
-							{getSubredditDisplayName(currentSubreddit)}
-						{/if}
+						{getSubredditDisplayName(currentSubreddit)}
 					</h2>
 					{#if showAdminFeatures}
 						<button
@@ -398,11 +401,7 @@
 		{/if}
 
 		<!-- Posts List -->
-		{#if loading}
-			<div class="text-center">
-				<div class="animate-pulse text-gray-300">Loading posts...</div>
-			</div>
-		{:else if posts.length > 0}
+		{#if posts.length > 0}
 			<div class="max-w-4xl mx-auto">
 				<div class="grid gap-4">
 					{#each posts as post}
@@ -637,6 +636,8 @@
 					← Choose Different Community
 				</a>
 			</div>
+		{/if}
+		</div>
 		{/if}
 	</div>
 	</div>

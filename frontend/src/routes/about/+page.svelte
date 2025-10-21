@@ -1,12 +1,22 @@
 <script lang="ts">
-	// No special logic needed for static about page
+	import { onMount } from 'svelte';
+	import { fade } from 'svelte/transition';
+
+	let contentVisible = false;
+
+	onMount(() => {
+		// Trigger fade-in animation
+		setTimeout(() => {
+			contentVisible = true;
+		}, 100);
+	});
 </script>
 
 <svelte:head>
 	<title>About - Reddit or Replicant</title>
 </svelte:head>
 
-<div class="min-h-screen text-gray-100" style="background: linear-gradient(180deg, #0a0a0b 0%, #111013 100%)">
+<div class="min-h-screen text-gray-100 relative z-10">
 	<!-- Fixed Toolbar -->
 	<div class="fixed top-0 left-0 right-0 z-50 border-b border-gray-700" style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);">
 		<div class="max-w-4xl mx-auto px-4 md:px-0 py-3">
@@ -25,7 +35,8 @@
 
 	<!-- Content with top padding to account for fixed toolbar -->
 	<div class="pt-16">
-		<div class="max-w-4xl mx-auto px-4 md:px-0 py-12">
+		{#if contentVisible}
+		<div class="max-w-4xl mx-auto px-4 md:px-0 py-12" transition:fade={{ duration: 1000 }}>
 			<div class="max-w-3xl mx-auto">
 				<h1 class="text-4xl font-bold mb-8 text-center" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">
 					About Reddit or <span class="glitch" data-text="Replicant">Replicant</span>
@@ -65,5 +76,6 @@
 				</div>
 			</div>
 		</div>
+		{/if}
 	</div>
 </div>

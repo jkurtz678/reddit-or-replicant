@@ -200,8 +200,8 @@ def generate_single_ai_comment(post_title: str, post_content: str, subreddit: st
     #         avoid_repetition_text += f"- AI Comment {i+1} opening: \"{opening}...\"\n"
     #     avoid_repetition_text += "\nIMPORTANT: Avoid starting with similar phrases, structures, or personal anecdotes as the AI comments above.\n"
 
-    # Get length statistics from real comments for guidance
-    real_word_counts = [len(comment.content.split()) for comment in flatten_all_comments(real_comments)]
+    # Get length statistics from real TOP-LEVEL comments only (not replies)
+    real_word_counts = [len(comment.content.split()) for comment in real_comments if comment.depth == 0]
 
     if real_word_counts:
         # Use percentiles for more natural distribution
@@ -222,15 +222,15 @@ def generate_single_ai_comment(post_title: str, post_content: str, subreddit: st
         else:  # 33% chance of longer comments
             base_suggested = percentile_75
 
-        # Add 5-word buffer to suggested length
-        suggested_length = base_suggested + 5
-        # Maximum is suggested + 50% buffer
-        max_allowed = int(suggested_length * 1.5)
-        print(f"Top-level comment length guidance: suggested={suggested_length} words, max={max_allowed} words (based on real comment analysis)")
+        # Remove buffer - use percentile directly as suggestion
+        suggested_length = base_suggested
+        # Tighter maximum - 30% over suggested instead of 50%
+        max_allowed = int(suggested_length * 1.3)
+        print(f"Top-level comment length guidance: suggested={suggested_length} words, max={max_allowed} words (based on real top-level comment analysis)")
     else:
         # Fallback for threads with no real comments
         suggested_length = 25
-        max_allowed = 35
+        max_allowed = 33
         avg_length = 20
         min_length = 5
         max_length = 50
@@ -707,15 +707,15 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
         else:  # 33% chance of longer replies
             base_suggested = percentile_75
 
-        # Add 10-word buffer to suggested length, but cap at 50 to leave room for maximum
-        suggested_length = min(base_suggested + 10, 50)
-        # Maximum is suggested + 50% buffer, capped at 80 for replies (more lenient)
-        max_allowed = min(int(suggested_length * 1.5), 80)
+        # Remove buffer - use percentile directly as suggestion
+        suggested_length = base_suggested
+        # Tighter maximum - 30% over suggested instead of 50%
+        max_allowed = int(suggested_length * 1.3)
         print(f"Reply length guidance: suggested={suggested_length} words, max={max_allowed} words (based on real reply analysis)")
     else:
         print("DEBUG: No real replies found, using fallback lengths")
         suggested_length = 15
-        max_allowed = 25
+        max_allowed = 20
         print(f"Reply length guidance: suggested={suggested_length} words, max={max_allowed} words (fallback)")
 
     # Build examples from REAL comments only (not AI-generated ones)
@@ -779,10 +779,9 @@ LENGTH GUIDANCE:
 
 CRITICAL REPLY REQUIREMENTS:
 - This is a REPLY to a specific comment, not a top-level comment
-- Be contextually relevant to what you're replying to
-- Sound like a quick human reaction, not an analysis
-- NEVER start with "u/username:" - jump straight into response
-- Don't over-explain - just react naturally"""
+- Match the tone and energy of the comment you're replying to
+- Make ONE point, not a comprehensive explanation
+- NEVER start with "u/username:" - jump straight into response"""
     
     try:
         response = anthropic_client.messages.create(

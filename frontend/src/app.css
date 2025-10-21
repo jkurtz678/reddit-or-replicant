@@ -48,7 +48,7 @@ body {
 	}
 
 	::view-transition-new(root) {
-		animation-name: fade-in;
+		animation-name: none; /* Disable fade-in, let page handle its own entrance */
 	}
 
 	@keyframes fade-out {

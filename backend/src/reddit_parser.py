@@ -154,6 +154,10 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
     # Filter out deleted/removed comments first (always do this)
     def is_valid_comment(comment):
         """Check if comment has valid content (not deleted/removed) and reasonable length"""
+        # Filter out AutoModerator and bot accounts
+        if comment.author.lower() in ['automoderator', 'deltabot', 'auto-moderator', 'bot']:
+            return False
+
         content = comment.content.strip().lower()
         if content in ['[deleted]', '[removed]', '', 'deleted', 'removed']:
             return False
@@ -165,11 +169,17 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
 
         return True
 
-    def filter_comments_recursive(comment_list):
-        """Recursively filter out deleted comments"""
+    def filter_comments_recursive(comment_list, max_depth=2):
+        """Recursively filter out deleted comments and enforce max depth"""
         filtered = []
         for comment in comment_list:
             if is_valid_comment(comment):
+                # Only include replies if we haven't exceeded max depth
+                # depth 0 = top-level, depth 1 = first reply, depth 2 = second reply
+                replies = []
+                if comment.depth < max_depth:
+                    replies = filter_comments_recursive(comment.replies, max_depth)
+
                 # Create copy with filtered replies
                 filtered_comment = Comment(
                     id=comment.id,
@@ -179,7 +189,7 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
                     score=comment.score,
                     depth=comment.depth,
                     parent_id=comment.parent_id,
-                    replies=filter_comments_recursive(comment.replies),
+                    replies=replies,
                     is_ai=comment.is_ai
                 )
                 filtered.append(filtered_comment)
@@ -189,10 +199,6 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
     comments = filter_comments_recursive(comments)
     print(f"DEBUG: After filtering, have {len(comments)} valid comments")
 
-    if len(comments) <= max_comments:
-        print(f"EXIT EARLY BECAUSE NOT ENOUGH COMMENTS AFTER FILTERING")
-        return comments
-    
     # Separate top-level comments, filter valid ones, and sort by score
     top_level_comments = [c for c in comments if c.depth == 0 and is_valid_comment(c)]
     top_level_comments.sort(key=lambda x: x.score, reverse=True)
@@ -233,30 +239,39 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
         selected_comments.append(selected_comment)
         total_count += 1
 
-        # Maybe add a reply (90% chance, but always if we need more replies for minimum)
+        # Maybe add replies (up to 2 max per comment)
         valid_replies = [r for r in comment.replies if is_valid_comment(r)]
         replies_selected_so_far = sum(1 for c in selected_comments if any(c.replies))
         force_reply = replies_selected_so_far < 2  # Force until we have 2 reply threads
 
-        if valid_replies and total_count < max_comments and (force_reply or random.random() < 0.9):
-            # Use weighted selection for replies too
-            reply_weights = [get_selection_weight(i) for i in range(len(valid_replies))]
-            selected_reply_idx = random.choices(range(len(valid_replies)), weights=reply_weights)[0]
-            selected_reply = valid_replies[selected_reply_idx]
+        # Decide how many replies to add to this comment (0, 1, or 2)
+        max_replies_to_add = min(2, len(valid_replies), max_comments - total_count)
 
-            reply_copy = Comment(
-                id=selected_reply.id,
-                author=selected_reply.author,
-                content=selected_reply.content,
-                content_html=selected_reply.content_html,
-                score=selected_reply.score,
-                depth=selected_reply.depth,
-                parent_id=selected_reply.parent_id,
-                replies=[],
-                is_ai=selected_reply.is_ai
-            )
-            selected_comment.replies.append(reply_copy)
-            total_count += 1
+        for reply_num in range(max_replies_to_add):
+            # 90% chance for first reply (or 100% if forced), 50% chance for second reply
+            should_add = force_reply if reply_num == 0 else (random.random() < 0.5 if reply_num == 1 else random.random() < 0.9)
+
+            if valid_replies and total_count < max_comments and should_add:
+                # Use weighted selection for replies
+                reply_weights = [get_selection_weight(i) for i in range(len(valid_replies))]
+                selected_reply_idx = random.choices(range(len(valid_replies)), weights=reply_weights)[0]
+                selected_reply = valid_replies.pop(selected_reply_idx)  # Remove so we don't pick it again
+
+                reply_copy = Comment(
+                    id=selected_reply.id,
+                    author=selected_reply.author,
+                    content=selected_reply.content,
+                    content_html=selected_reply.content_html,
+                    score=selected_reply.score,
+                    depth=selected_reply.depth,
+                    parent_id=selected_reply.parent_id,
+                    replies=[],
+                    is_ai=selected_reply.is_ai
+                )
+                selected_comment.replies.append(reply_copy)
+                total_count += 1
+            else:
+                break  # Stop trying to add more replies if we didn't add this one
     
     return selected_comments
 
