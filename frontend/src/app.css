@@ -180,6 +180,12 @@ body {
 	filter: drop-shadow(0 1px 3px);
 }
 
+/* Hide glitch pseudo-elements on hover to show clean text */
+.glitch:hover::before,
+.glitch:hover::after {
+	display: none;
+}
+
 /* Intermediate state during font transition */
 .content-text.transitioning {
 	opacity: 0;

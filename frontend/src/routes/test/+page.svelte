@@ -378,9 +378,22 @@
 			// Step 3: Start glitching after fade back in with random timing
 			setTimeout(() => {
 				function scheduleNextGlitch() {
+					// Don't glitch if element is being hovered
+					if (element.matches(':hover')) {
+						// Restore original text while hovered
+						const originalText = originalTexts.get(commentId);
+						if (originalText) {
+							element.textContent = originalText;
+						}
+						// Check again after a short delay
+						const timeout = setTimeout(scheduleNextGlitch, 300);
+						glitchIntervals.set(commentId, timeout);
+						return;
+					}
+
 					const text = originalTexts.get(commentId) || originalText;
 					const textArray = text.split('');
-					
+
 					// Get indices of non-whitespace characters only
 					const nonWhitespaceIndices = [];
 					textArray.forEach((char, index) => {
@@ -388,31 +401,31 @@
 							nonWhitespaceIndices.push(index);
 						}
 					});
-					
+
 					// Randomize percentage between 1% and 4%
 					const randomPercentage = 0.01 + (Math.random() * 0.03);
 					const numToGlitch = Math.floor(nonWhitespaceIndices.length * randomPercentage);
 					const indicesToGlitch = new Set();
-					
+
 					// Pick random non-whitespace indices to glitch
 					while (indicesToGlitch.size < numToGlitch && nonWhitespaceIndices.length > 0) {
 						const randomIndex = nonWhitespaceIndices[Math.floor(Math.random() * nonWhitespaceIndices.length)];
 						indicesToGlitch.add(randomIndex);
 					}
-					
+
 					// Replace characters at those indices (preserving whitespace)
 					indicesToGlitch.forEach(index => {
 						textArray[index] = glitchChars[Math.floor(Math.random() * glitchChars.length)];
 					});
-					
+
 					element.textContent = textArray.join('');
-					
+
 					// Schedule next glitch with random timing (less frequent)
 					const nextDelay = 800 + Math.random() * 600; // Random between 800-1400ms
 					const timeout = setTimeout(scheduleNextGlitch, nextDelay);
 					glitchIntervals.set(commentId, timeout);
 				}
-				
+
 				scheduleNextGlitch();
 			}, 300); // Wait for fade back in
 		}, 300); // Wait for fade out (matches CSS transition)
@@ -799,7 +812,7 @@
 
 			<!-- Comments -->
 			{#if redditData.comments && redditData.comments.length > 0}
-				<div class="p-6">
+				<div class="p-4 md:p-6">
 					<h2 class="text-lg font-semibold mb-4 text-white">Comments</h2>
 					{#each redditData.comments as comment}
 						{@const allComments = getAllComments(comment)}
@@ -835,7 +848,7 @@
 										{#if !guessState?.guessed}
 											{@const isLocked = hasUnguessedReplies(flatComment, guessedComments)}
 											<div class="flex gap-3 items-center">
-												<span class="text-xs text-gray-400">Origin:</span>
+												<span class="text-xs text-gray-400 hidden sm:inline">Origin:</span>
 												<button
 													class="px-2 py-1 text-white rounded text-xs transition-all duration-200"
 													class:cursor-pointer={!isLocked}
