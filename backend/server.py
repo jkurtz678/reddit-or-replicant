@@ -5,6 +5,7 @@ import json
 import os
 import httpx
 import asyncio
+import time
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -298,8 +299,19 @@ def get_posts(include_deleted: bool = False, x_admin_env: str = Header(None)):
 @app.get("/api/posts/subreddit/{subreddit}")
 def get_posts_by_subreddit_endpoint(subreddit: str, include_deleted: bool = False, x_admin_env: str = Header(None)):
     """Get posts filtered by subreddit"""
+    start_time = time.time()
+    print(f"[TIMING] GET /api/posts/subreddit/{subreddit} - Request started")
+
     force_turso = parse_admin_environment(x_admin_env)
+
+    db_start = time.time()
     posts = get_posts_by_subreddit(subreddit, include_deleted=include_deleted, force_turso=force_turso)
+    db_time = time.time() - db_start
+    print(f"[TIMING] GET /api/posts/subreddit/{subreddit} - DB query took {db_time:.3f}s")
+
+    total_time = time.time() - start_time
+    print(f"[TIMING] GET /api/posts/subreddit/{subreddit} - Total request took {total_time:.3f}s")
+
     return {"posts": posts, "subreddit": subreddit}
 
 @app.post("/api/admin/posts/{post_id}/delete")
@@ -361,10 +373,25 @@ def save_guess(request: UserGuessRequest, x_admin_env: str = Header(None)):
 @app.post("/api/users/progress")
 def get_progress(request: UserProgressRequest, x_admin_env: str = Header(None)):
     """Get user's progress on a specific post"""
+    start_time = time.time()
+    print(f"[TIMING] POST /api/users/progress - Request started (post_id={request.post_id})")
+
     try:
         force_turso = parse_admin_environment(x_admin_env)
+
+        db_start = time.time()
         user_id = get_or_create_user(request.anonymous_id, force_turso)
+        db_time = time.time() - db_start
+        print(f"[TIMING] POST /api/users/progress - get_or_create_user took {db_time:.3f}s")
+
+        db_start = time.time()
         progress = get_user_progress(user_id, request.post_id, force_turso)
+        db_time = time.time() - db_start
+        print(f"[TIMING] POST /api/users/progress - get_user_progress took {db_time:.3f}s")
+
+        total_time = time.time() - start_time
+        print(f"[TIMING] POST /api/users/progress - Total request took {total_time:.3f}s")
+
         return progress
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get progress: {str(e)}")
@@ -372,10 +399,25 @@ def get_progress(request: UserProgressRequest, x_admin_env: str = Header(None)):
 @app.get("/api/users/{anonymous_id}/progress")
 def get_all_progress(anonymous_id: str, x_admin_env: str = Header(None)):
     """Get user's progress across all posts"""
+    start_time = time.time()
+    print(f"[TIMING] GET /api/users/{anonymous_id}/progress - Request started")
+
     try:
         force_turso = parse_admin_environment(x_admin_env)
+
+        db_start = time.time()
         user_id = get_or_create_user(anonymous_id, force_turso)
+        db_time = time.time() - db_start
+        print(f"[TIMING] GET /api/users/{anonymous_id}/progress - get_or_create_user took {db_time:.3f}s")
+
+        db_start = time.time()
         progress = get_user_all_progress(user_id, force_turso)
+        db_time = time.time() - db_start
+        print(f"[TIMING] GET /api/users/{anonymous_id}/progress - get_user_all_progress took {db_time:.3f}s")
+
+        total_time = time.time() - start_time
+        print(f"[TIMING] GET /api/users/{anonymous_id}/progress - Total request took {total_time:.3f}s")
+
         return {"progress": progress}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get progress: {str(e)}")
@@ -601,14 +643,26 @@ def get_test_reddit_raw():
 @app.get("/api/mixed-comments/{post_id}")
 def get_mixed_comments(post_id: int, x_admin_env: str = Header(None)):
     """Get the mixed real + AI comments for a specific post"""
+    start_time = time.time()
+    print(f"[TIMING] GET /api/mixed-comments/{post_id} - Request started")
+
     force_turso = parse_admin_environment(x_admin_env)
+
+    db_start = time.time()
     post_data = get_post_by_id(post_id, force_turso=force_turso)
+    db_time = time.time() - db_start
+    print(f"[TIMING] GET /api/mixed-comments/{post_id} - get_post_by_id took {db_time:.3f}s")
+
     if not post_data:
         raise HTTPException(status_code=404, detail="Post not found")
 
     # Return data in the format expected by frontend
     response = post_data['mixed_comments'].copy()
     response['tyrell_agenda'] = post_data.get('tyrell_agenda')
+
+    total_time = time.time() - start_time
+    print(f"[TIMING] GET /api/mixed-comments/{post_id} - Total request took {total_time:.3f}s")
+
     return response
 
 # Simple root endpoint for API status

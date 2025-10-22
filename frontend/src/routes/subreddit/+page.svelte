@@ -48,13 +48,14 @@
 	>
 		<div class="max-w-5xl mx-auto px-8 xl:px-0 py-3">
 			<div class="flex items-center justify-between">
-				<a
-					href="/"
-					class="text-lg font-bold cursor-pointer hover:text-blue-300 transition-colors"
-					style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);"
-				>
-					Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
-				</a>
+				<div class="flex items-center gap-4">
+					<a href="/" class="transition-colors flex items-center gap-1" style="color: #00d4ff;" on:mouseenter={(e) => e.target.style.color='#33e0ff'} on:mouseleave={(e) => e.target.style.color='#00d4ff'}>
+						← Back
+					</a>
+					<h1 class="text-lg font-bold hidden sm:block" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
+						Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
+					</h1>
+				</div>
 				<div class="flex items-center gap-4">
 					<a href="/about" class="transition-colors text-sm" style="color: #00d4ff;"> About </a>
 				</div>

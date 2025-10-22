@@ -6,9 +6,12 @@ Database service for storing Reddit posts and generated comments.
 import json
 import os
 import sqlite3
+import threading
+import time
 from datetime import datetime
 from typing import List, Dict, Optional
 from contextlib import contextmanager
+from queue import Queue, Empty
 try:
     import libsql
     LIBSQL_AVAILABLE = True
@@ -20,6 +23,67 @@ DB_FILE = "replicant.db"
 # Turso configuration
 TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
 TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+
+# Connection pool for Turso
+class TursoConnectionPool:
+    """Simple connection pool for libsql/Turso connections"""
+
+    def __init__(self, database_url: str, auth_token: str, pool_size: int = 5):
+        self.database_url = database_url
+        self.auth_token = auth_token
+        self.pool_size = pool_size
+        self.pool: Queue = Queue(maxsize=pool_size)
+        self.lock = threading.Lock()
+        self.connection_count = 0
+
+    def get_connection(self):
+        """Get a connection from the pool or create a new one"""
+        try:
+            # Try to get an existing connection (non-blocking)
+            conn = self.pool.get_nowait()
+            print(f"[POOL] Reusing connection from pool (pool size: {self.pool.qsize()})")
+            return conn
+        except Empty:
+            # No connection available, create a new one if under limit
+            with self.lock:
+                if self.connection_count < self.pool_size:
+                    conn_start = time.time()
+                    conn = libsql.connect(database=self.database_url, auth_token=self.auth_token)
+                    conn_time = time.time() - conn_start
+                    self.connection_count += 1
+                    print(f"[POOL] Created new connection #{self.connection_count} (took {conn_time:.3f}s)")
+                    return conn
+                else:
+                    # Pool is full, wait for a connection to become available
+                    print(f"[POOL] Pool full, waiting for connection...")
+                    return self.pool.get(block=True)
+
+    def return_connection(self, conn):
+        """Return a connection to the pool"""
+        try:
+            self.pool.put_nowait(conn)
+            print(f"[POOL] Returned connection to pool (pool size: {self.pool.qsize()})")
+        except:
+            # Pool is full, close the connection
+            print(f"[POOL] Pool full, closing connection")
+            conn.close()
+            with self.lock:
+                self.connection_count -= 1
+
+    def close_all(self):
+        """Close all connections in the pool"""
+        while not self.pool.empty():
+            try:
+                conn = self.pool.get_nowait()
+                conn.close()
+                with self.lock:
+                    self.connection_count -= 1
+            except Empty:
+                break
+
+# Global connection pool (initialized on first use)
+_turso_pool: Optional[TursoConnectionPool] = None
+_pool_lock = threading.Lock()
 
 def convert_rows_to_dicts(rows, columns):
     """Convert libsql rows (tuples) to dictionaries"""
@@ -148,9 +212,22 @@ def _run_migrations(conn):
         # Column doesn't exist, add it
         conn.execute("ALTER TABLE user_guesses ADD COLUMN flagged_as_obvious INTEGER DEFAULT 0")
 
+def get_turso_pool():
+    """Get or create the global Turso connection pool"""
+    global _turso_pool
+    if _turso_pool is None:
+        with _pool_lock:
+            if _turso_pool is None:  # Double-check after acquiring lock
+                _turso_pool = TursoConnectionPool(
+                    database_url=TURSO_DATABASE_URL,
+                    auth_token=TURSO_AUTH_TOKEN,
+                    pool_size=5  # Maintain up to 5 connections
+                )
+    return _turso_pool
+
 @contextmanager
 def get_db_connection(force_turso: bool = None):
-    """Context manager for database connections"""
+    """Context manager for database connections with connection pooling"""
     should_use_turso = use_turso()
 
     # Allow override via parameter
@@ -161,20 +238,33 @@ def get_db_connection(force_turso: bool = None):
     # print(f"get_db_connection: force_turso={force_turso}, should_use_turso={should_use_turso}")
 
     if should_use_turso:
-        # Use Turso remote connection
-        conn = libsql.connect(database=TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+        # Use Turso connection pool
+        pool = get_turso_pool()
+        conn_start = time.time()
+        conn = pool.get_connection()
+        conn_time = time.time() - conn_start
+        print(f"[DB TIMING] Getting connection from pool took {conn_time:.3f}s")
         try:
             yield conn
         finally:
-            conn.close()
+            return_start = time.time()
+            pool.return_connection(conn)
+            return_time = time.time() - return_start
+            print(f"[DB TIMING] Returning connection to pool took {return_time:.3f}s")
     else:
         # Use libsql for local file too - consistent format
         print("Using libsql local connection")
+        conn_start = time.time()
         conn = libsql.connect(f"file:{DB_FILE}")
+        conn_time = time.time() - conn_start
+        print(f"[DB TIMING] Local connection establishment took {conn_time:.3f}s")
         try:
             yield conn
         finally:
+            close_start = time.time()
             conn.close()
+            close_time = time.time() - close_start
+            print(f"[DB TIMING] Local connection close took {close_time:.3f}s")
 
 def save_post(reddit_url: str, title: str, subreddit: str,
               mixed_comments_data: dict, ai_count: int, total_count: int,
