@@ -71,7 +71,7 @@
 			<div class="mt-8 flex justify-end">
 				<button
 					on:click={onClose}
-					class="px-8 py-3 text-white rounded transition-all duration-200 hover:scale-105 font-semibold"
+					class="px-8 py-3 text-white rounded transition-all duration-200 hover:scale-105 font-semibold cursor-pointer"
 					style="background: linear-gradient(135deg, #7f1d1d, #ef4444); border: 1px solid #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);"
 					on:mouseenter={(e) =>
 						(e.currentTarget.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.4)')}
