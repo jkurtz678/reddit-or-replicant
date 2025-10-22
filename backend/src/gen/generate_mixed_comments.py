@@ -19,7 +19,7 @@ from typing import List, Dict, Any
 import anthropic
 from faker import Faker
 from ..reddit_parser import parse_reddit_json, Comment, select_representative_comments
-from .comment_archetypes import get_available_archetypes, build_full_prompt, DEBATE_POSITION_PROMPT, DEBATE_POSITION_PROMPT_SAFE, POST_SUMMARIZATION_PROMPT
+from .comment_archetypes import get_available_archetypes, build_full_prompt, DEBATE_POSITION_PROMPT, DEBATE_POSITION_PROMPT_SAFE, POST_SUMMARIZATION_PROMPT, WRITING_STYLES, apply_writing_style_formatting
 from .comment_legacy import generate_ai_comments_legacy
 
 # Constants
@@ -28,6 +28,13 @@ USE_ARCHETYPE_SYSTEM = True
 
 # Initialize Faker for username generation
 fake = Faker()
+
+
+def select_writing_style() -> str:
+    """Select a random writing style based on weights"""
+    styles = list(WRITING_STYLES.keys())
+    weights = [WRITING_STYLES[style]['weight'] for style in styles]
+    return random.choices(styles, weights=weights)[0]
 
 
 def generate_reddit_username() -> str:
@@ -240,7 +247,7 @@ def generate_single_ai_comment(post_title: str, post_content: str, subreddit: st
 LENGTH GUIDANCE:
 - Suggested: {suggested_length} words, Maximum: {max_allowed} words
 - Real comments here: {min_length}-{max_length} words (avg: {avg_length:.0f})
-- Aim for suggested length but maximum gives you flexibility"""
+- Aim for suggested length. Do NOT exceed the maximum."""
 
     # Randomly assign directive tier (25% tier 1, 37.5% tier 2, 37.5% tier 3)
     rand_val = random.random()
@@ -253,6 +260,10 @@ LENGTH GUIDANCE:
 
     print(f"Directive tier {directive_tier} assigned to {archetype_key}")
 
+    # Select writing style for this comment
+    writing_style = select_writing_style()
+    print(f"Writing style '{writing_style}' assigned to {archetype_key}")
+
     # Build the full prompt using the archetype system with our enhancements
     base_prompt = build_full_prompt(
         archetype_key=archetype_key,
@@ -261,7 +272,8 @@ LENGTH GUIDANCE:
         post_content=post_content,
         real_comment_examples=examples,
         tyrell_agenda=tyrell_agenda,
-        directive_tier=directive_tier
+        directive_tier=directive_tier,
+        writing_style=writing_style
     )
 
     # Enhance the prompt with our repetition prevention and length guidance
@@ -328,14 +340,17 @@ CRITICAL REMINDERS:
             print(f"Comment too long ({word_count} words, maximum {max_allowed}), skipping...")
             return None
 
+        # Apply writing style formatting (post-processing)
+        formatted_content = apply_writing_style_formatting(comment_data['content'], writing_style)
+
         # Generate realistic score
         min_score, max_score = get_score_range(real_comments)
-        
+
         # Create Comment object
         comment = Comment(
             id=str(uuid.uuid4()),
             author=generate_reddit_username(),
-            content=comment_data['content'],
+            content=formatted_content,
             content_html=None,  # No HTML for AI comments
             score=random.randint(min_score, max_score),
             depth=0,
@@ -344,7 +359,8 @@ CRITICAL REMINDERS:
             is_ai=True,
             generation_prompt=prompt,
             archetype_used=archetype_key,
-            directive_tier=directive_tier
+            directive_tier=directive_tier,
+            writing_style=writing_style
         )
         
         print(f"Generated comment with archetype {archetype_key}: {comment.content[:50]}...")
@@ -755,6 +771,10 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
 
     print(f"Directive tier {directive_tier} assigned to reply {selected_archetype}")
 
+    # Select writing style for this reply
+    writing_style = select_writing_style()
+    print(f"Writing style '{writing_style}' assigned to reply {selected_archetype}")
+
     # Use archetype system
     base_prompt = build_full_prompt(
         archetype_key=selected_archetype,
@@ -763,7 +783,8 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
         post_content=post_content,
         real_comment_examples=examples,
         tyrell_agenda=tyrell_agenda,
-        directive_tier=directive_tier
+        directive_tier=directive_tier,
+        writing_style=writing_style
     )
 
     # Calculate average for prompt display
@@ -773,7 +794,7 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
 LENGTH GUIDANCE:
 - Suggested: {suggested_length} words, Maximum: {max_allowed} words
 - Real replies here average {avg_reply_length:.0f} words
-- Aim for suggested length but maximum gives you flexibility"""
+- Aim for suggested length. Do NOT exceed the maximum."""
 
     prompt = f"""{base_prompt}{context_str}{avoid_repetition_text}{length_guidance}
 
@@ -831,12 +852,15 @@ CRITICAL REPLY REQUIREMENTS:
         if word_count > max_allowed:
             print(f"Reply too long ({word_count} words, maximum {max_allowed}), skipping...")
             return None
-        
+
+        # Apply writing style formatting (post-processing)
+        formatted_content = apply_writing_style_formatting(reply_data['content'], writing_style)
+
         # Create reply with appropriate depth
         reply = Comment(
             id=str(uuid.uuid4()),
             author=generate_reddit_username(),
-            content=reply_data['content'],
+            content=formatted_content,
             content_html=None,
             score=random.randint(1, max(50, parent_comment.score)),
             depth=parent_comment.depth + 1,
@@ -845,7 +869,8 @@ CRITICAL REPLY REQUIREMENTS:
             is_ai=True,
             generation_prompt=prompt,
             archetype_used=selected_archetype,
-            directive_tier=directive_tier
+            directive_tier=directive_tier,
+            writing_style=writing_style
         )
 
         print(f"Generated {selected_archetype} reply ({word_count} words): {reply.content[:50]}...")
@@ -1053,10 +1078,11 @@ def main():
             'replies': [comment_to_dict(reply) for reply in comment.replies],
             'is_ai': comment.is_ai
         }
-        # Include archetype and directive tier for AI comments
+        # Include archetype, directive tier, and writing style for AI comments
         if comment.is_ai:
             result['archetype_used'] = comment.archetype_used
             result['directive_tier'] = comment.directive_tier
+            result['writing_style'] = comment.writing_style
         return result
     
     # Create final data structure

@@ -41,31 +41,24 @@ class TursoConnectionPool:
         try:
             # Try to get an existing connection (non-blocking)
             conn = self.pool.get_nowait()
-            print(f"[POOL] Reusing connection from pool (pool size: {self.pool.qsize()})")
             return conn
         except Empty:
             # No connection available, create a new one if under limit
             with self.lock:
                 if self.connection_count < self.pool_size:
-                    conn_start = time.time()
                     conn = libsql.connect(database=self.database_url, auth_token=self.auth_token)
-                    conn_time = time.time() - conn_start
                     self.connection_count += 1
-                    print(f"[POOL] Created new connection #{self.connection_count} (took {conn_time:.3f}s)")
                     return conn
                 else:
                     # Pool is full, wait for a connection to become available
-                    print(f"[POOL] Pool full, waiting for connection...")
                     return self.pool.get(block=True)
 
     def return_connection(self, conn):
         """Return a connection to the pool"""
         try:
             self.pool.put_nowait(conn)
-            print(f"[POOL] Returned connection to pool (pool size: {self.pool.qsize()})")
         except:
             # Pool is full, close the connection
-            print(f"[POOL] Pool full, closing connection")
             conn.close()
             with self.lock:
                 self.connection_count -= 1
@@ -240,31 +233,19 @@ def get_db_connection(force_turso: bool = None):
     if should_use_turso:
         # Use Turso connection pool
         pool = get_turso_pool()
-        conn_start = time.time()
         conn = pool.get_connection()
-        conn_time = time.time() - conn_start
-        print(f"[DB TIMING] Getting connection from pool took {conn_time:.3f}s")
         try:
             yield conn
         finally:
-            return_start = time.time()
             pool.return_connection(conn)
-            return_time = time.time() - return_start
-            print(f"[DB TIMING] Returning connection to pool took {return_time:.3f}s")
     else:
         # Use libsql for local file too - consistent format
         print("Using libsql local connection")
-        conn_start = time.time()
         conn = libsql.connect(f"file:{DB_FILE}")
-        conn_time = time.time() - conn_start
-        print(f"[DB TIMING] Local connection establishment took {conn_time:.3f}s")
         try:
             yield conn
         finally:
-            close_start = time.time()
             conn.close()
-            close_time = time.time() - close_start
-            print(f"[DB TIMING] Local connection close took {close_time:.3f}s")
 
 def save_post(reddit_url: str, title: str, subreddit: str,
               mixed_comments_data: dict, ai_count: int, total_count: int,

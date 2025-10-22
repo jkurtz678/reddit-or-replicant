@@ -112,6 +112,8 @@ def comment_to_dict(comment) -> dict:
         result['archetype_used'] = comment.archetype_used
     if hasattr(comment, 'directive_tier') and comment.directive_tier is not None:
         result['directive_tier'] = comment.directive_tier
+    if hasattr(comment, 'writing_style') and comment.writing_style is not None:
+        result['writing_style'] = comment.writing_style
 
     return result
 

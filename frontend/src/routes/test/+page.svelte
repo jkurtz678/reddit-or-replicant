@@ -37,6 +37,7 @@
 		generation_prompt?: string;
 		archetype_used?: string;
 		directive_tier?: number;
+		writing_style?: string;
 	}
 
 	interface RedditData {
@@ -592,6 +593,7 @@
 			is_ai: comment.is_ai,
 			archetype_used: comment.archetype_used,
 			directive_tier: comment.directive_tier,
+			writing_style: comment.writing_style,
 			replies: comment.replies.map(reply => createSimplifiedComment(reply))
 		};
 	}
@@ -662,11 +664,16 @@
 					{#if contentVisible && !loading}
 					<div class="flex items-center gap-4 md:gap-6 text-sm" transition:fade={{ duration: 800 }}>
 						<div class="flex items-center gap-2">
-							<span style="color: #4ade80;">✓</span>
+							<svg class="w-5 h-5" fill="none" stroke="#4ade80" stroke-width="3" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+								<polyline points="20 6 9 17 4 12"></polyline>
+							</svg>
 							<span class="text-gray-300">{correctGuesses}</span>
 						</div>
 						<div class="flex items-center gap-2">
-							<span style="color: #f87171;">✗</span>
+							<svg class="w-5 h-5" fill="none" stroke="#f87171" stroke-width="3" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+								<line x1="18" y1="6" x2="6" y2="18"></line>
+								<line x1="6" y1="6" x2="18" y2="18"></line>
+							</svg>
 							<span class="text-gray-300">{incorrectGuesses}</span>
 						</div>
 						{#if remainingGuesses > 0}
@@ -1196,11 +1203,35 @@
 			<div class="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
 				<!-- Left side: Archetype + Generated Comment -->
 				<div class="flex flex-col flex-1 min-w-0">
-					{#if promptDialogComment.archetype_used}
-						<div class="mb-4">
-							<h3 class="text-sm font-semibold mb-2" style="color: #a78bfa;">Archetype:</h3>
-							<div class="p-3 rounded border border-gray-600 text-sm" style="background: rgba(31, 31, 35, 0.6); color: #e5e7eb;">
-								{promptDialogComment.archetype_used}
+					{#if promptDialogComment.archetype_used || promptDialogComment.directive_tier || promptDialogComment.writing_style}
+						<div class="mb-4 space-y-3">
+							{#if promptDialogComment.archetype_used}
+								<div>
+									<h3 class="text-sm font-semibold mb-2" style="color: #a78bfa;">Archetype:</h3>
+									<div class="p-3 rounded border border-gray-600 text-sm" style="background: rgba(31, 31, 35, 0.6); color: #e5e7eb;">
+										{promptDialogComment.archetype_used}
+									</div>
+								</div>
+							{/if}
+
+							<div class="flex gap-3">
+								{#if promptDialogComment.directive_tier}
+									<div class="flex-1">
+										<h3 class="text-sm font-semibold mb-2" style="color: #a78bfa;">Directive Tier:</h3>
+										<div class="p-3 rounded border border-gray-600 text-sm" style="background: rgba(31, 31, 35, 0.6); color: #e5e7eb;">
+											{promptDialogComment.directive_tier === 1 ? 'Strong' : promptDialogComment.directive_tier === 2 ? 'Subtle' : 'None'}
+										</div>
+									</div>
+								{/if}
+
+								{#if promptDialogComment.writing_style}
+									<div class="flex-1">
+										<h3 class="text-sm font-semibold mb-2" style="color: #a78bfa;">Writing Style:</h3>
+										<div class="p-3 rounded border border-gray-600 text-sm capitalize" style="background: rgba(31, 31, 35, 0.6); color: #e5e7eb;">
+											{promptDialogComment.writing_style}
+										</div>
+									</div>
+								{/if}
 							</div>
 						</div>
 					{/if}

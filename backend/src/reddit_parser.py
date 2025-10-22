@@ -15,7 +15,7 @@ class Post:
     comment_count: int
 
 
-@dataclass 
+@dataclass
 class Comment:
     id: str
     author: str
@@ -29,6 +29,7 @@ class Comment:
     generation_prompt: Optional[str] = None
     archetype_used: Optional[str] = None
     directive_tier: Optional[int] = None  # 1=strong, 2=subtle, 3=none
+    writing_style: Optional[str] = None  # standard, casual, relaxed, stream
 
 
 def clean_html_content(html_content: str) -> str:
@@ -190,7 +191,11 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
                     depth=comment.depth,
                     parent_id=comment.parent_id,
                     replies=replies,
-                    is_ai=comment.is_ai
+                    is_ai=comment.is_ai,
+                    generation_prompt=comment.generation_prompt,
+                    archetype_used=comment.archetype_used,
+                    directive_tier=comment.directive_tier,
+                    writing_style=comment.writing_style
                 )
                 filtered.append(filtered_comment)
         return filtered
@@ -234,7 +239,11 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
             depth=comment.depth,
             parent_id=comment.parent_id,
             replies=[],
-            is_ai=comment.is_ai
+            is_ai=comment.is_ai,
+            generation_prompt=comment.generation_prompt,
+            archetype_used=comment.archetype_used,
+            directive_tier=comment.directive_tier,
+            writing_style=comment.writing_style
         )
         selected_comments.append(selected_comment)
         total_count += 1
@@ -266,7 +275,11 @@ def select_representative_comments(comments: List[Comment], max_comments: int = 
                     depth=selected_reply.depth,
                     parent_id=selected_reply.parent_id,
                     replies=[],
-                    is_ai=selected_reply.is_ai
+                    is_ai=selected_reply.is_ai,
+                    generation_prompt=selected_reply.generation_prompt,
+                    archetype_used=selected_reply.archetype_used,
+                    directive_tier=selected_reply.directive_tier,
+                    writing_style=selected_reply.writing_style
                 )
                 selected_comment.replies.append(reply_copy)
                 total_count += 1

@@ -3,6 +3,32 @@ Comment archetype definitions for generating realistic Reddit comments.
 Each archetype defines a specific personality/style for AI-generated comments.
 """
 
+import random
+import re
+
+# Writing style variations for post-processing formatting quirks
+# No longer used in prompts - applied mechanically after generation
+WRITING_STYLES = {
+    'standard': {
+        'weight': 0.50,
+        'drop_final_period_chance': 0.20,
+        'lowercase_chance': 0.10,
+        'typo_chance': 0.0
+    },
+    'casual': {
+        'weight': 0.35,
+        'drop_final_period_chance': 0.40,
+        'lowercase_chance': 0.20,
+        'typo_chance': 0.0
+    },
+    'relaxed': {
+        'weight': 0.15,
+        'drop_final_period_chance': 0.60,
+        'lowercase_chance': 0.30,
+        'typo_chance': 0.05
+    }
+}
+
 # Common prompt components that apply to all archetypes
 COMMON_CONTEXT_TEMPLATE = """You are generating a realistic Reddit comment for r/{subreddit}.
 
@@ -41,7 +67,7 @@ FORMATTING: Use single newlines to break up longer comments into paragraphs when
 SUGGESTION: Try to reference specific details from the post when possible to make your response feel more engaged.
 
 Format as JSON:
-{"content": "your comment here"}
+{{"content": "your comment here"}}
 
 DO NOT include usernames - just the comment content.
 """
@@ -693,15 +719,18 @@ def get_archetype_prompt(archetype_key: str) -> dict:
 
 def build_full_prompt(archetype_key: str, subreddit: str, post_title: str,
                      post_content: str, real_comment_examples: str, tyrell_agenda: str = "",
-                     directive_tier: int = 1) -> str:
+                     directive_tier: int = 1, writing_style: str = 'standard') -> str:
     """
     Build complete prompt by combining common template + archetype-specific prompt
 
     directive_tier: 1 (strong/30%), 2 (subtle/40%), 3 (none/30%)
+    writing_style: One of the keys from WRITING_STYLES dict (used for post-processing, not prompting)
     """
     archetype = get_archetype_prompt(archetype_key)
     if not archetype:
         raise ValueError(f"Unknown archetype: {archetype_key}")
+
+    # Writing style is no longer used in prompt - it's applied in post-processing
 
     # Select directive template based on tier
     if directive_tier == 1:
@@ -721,3 +750,78 @@ def build_full_prompt(archetype_key: str, subreddit: str, post_title: str,
 
     full_prompt = context + archetype['prompt'] + COMMON_REQUIREMENTS
     return full_prompt
+
+
+def apply_writing_style_formatting(content: str, writing_style: str) -> str:
+    """
+    Apply formatting quirks to generated content based on writing style.
+    This runs AFTER LLM generation to add natural imperfections.
+
+    Args:
+        content: The generated comment text
+        writing_style: One of 'standard', 'casual', 'relaxed'
+
+    Returns:
+        Modified content with formatting quirks applied
+    """
+    if writing_style not in WRITING_STYLES:
+        return content
+
+    style_config = WRITING_STYLES[writing_style]
+    modified_content = content
+
+    # 1. Drop final period
+    if random.random() < style_config['drop_final_period_chance']:
+        # Only drop if comment ends with a period (not !, ?, etc)
+        if modified_content.strip().endswith('.'):
+            modified_content = modified_content.strip()[:-1]
+
+    # 2. Lowercase transformations
+    if random.random() < style_config['lowercase_chance']:
+        # Randomly choose ONE lowercase transformation (not multiple)
+        transformations = []
+
+        # Option A: Lowercase first letter of sentence
+        if modified_content and modified_content[0].isupper():
+            transformations.append('first_letter')
+
+        # Option B: Lowercase a proper noun (capitalized word mid-sentence)
+        # Find words that start with uppercase in the middle of the text
+        proper_nouns = re.findall(r'(?<=\s)[A-Z][a-z]+', modified_content)
+        if proper_nouns:
+            transformations.append('proper_noun')
+
+        if transformations:
+            choice = random.choice(transformations)
+
+            if choice == 'first_letter':
+                modified_content = modified_content[0].lower() + modified_content[1:]
+            elif choice == 'proper_noun':
+                # Pick one random proper noun to lowercase
+                noun_to_lower = random.choice(proper_nouns)
+                # Replace first occurrence only
+                modified_content = modified_content.replace(noun_to_lower, noun_to_lower.lower(), 1)
+
+    # 3. Typos (very rare, only for relaxed)
+    if random.random() < style_config['typo_chance']:
+        # Simple typo: double a letter or drop a letter
+        words = modified_content.split()
+        if len(words) > 3:  # Only if comment has enough words
+            # Pick a word in the middle (not first or last)
+            word_idx = random.randint(1, len(words) - 2)
+            word = words[word_idx]
+
+            if len(word) > 3:  # Only typo longer words
+                typo_type = random.choice(['double', 'drop'])
+                char_idx = random.randint(1, len(word) - 2)
+
+                if typo_type == 'double':
+                    # Double a letter
+                    words[word_idx] = word[:char_idx] + word[char_idx] + word[char_idx:]
+                else:
+                    # Drop a letter
+                    words[word_idx] = word[:char_idx] + word[char_idx+1:]
+
+                modified_content = ' '.join(words)
+
+    return modified_content
