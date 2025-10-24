@@ -49,7 +49,7 @@
 			<div class="space-y-6 text-gray-200">
 				<div>
 					<p class="leading-relaxed">
-						The post below is real, pulled directly from Reddit—but it's been infiltrated by <span
+						The post below is real, pulled directly from Reddit — but it's been infiltrated by <span
 							class="font-bold text-red-500"
 							style="text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.6);"
 							>Replicants</span

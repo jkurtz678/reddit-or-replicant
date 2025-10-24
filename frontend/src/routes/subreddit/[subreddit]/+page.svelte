@@ -329,7 +329,11 @@
 			<div class="flex items-center justify-between">
 				<div class="flex items-center gap-4">
 					<a href="/subreddit" class="transition-colors flex items-center gap-1" style="color: #00d4ff;" >
-						← Back
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+							<line x1="19" y1="12" x2="5" y2="12"></line>
+							<polyline points="12 19 5 12 12 5"></polyline>
+						</svg>
+						Back
 					</a>
 					<a href="/" class="text-lg font-bold cursor-pointer hover:text-blue-300 transition-colors hidden sm:block" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
 						Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?

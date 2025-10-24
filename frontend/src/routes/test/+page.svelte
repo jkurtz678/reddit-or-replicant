@@ -653,7 +653,11 @@
 					<!-- Back Button & Title -->
 					<div class="flex items-center gap-4">
 						<a href={currentSubreddit ? `/subreddit/${currentSubreddit}` : '/subreddit'} class="transition-colors flex items-center gap-1" style="color: #00d4ff;" on:mouseenter={(e) => e.target.style.color='#33e0ff'} on:mouseleave={(e) => e.target.style.color='#00d4ff'}>
-							← Back
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+								<line x1="19" y1="12" x2="5" y2="12"></line>
+								<polyline points="12 19 5 12 12 5"></polyline>
+							</svg>
+							Back
 						</a>
 						<h1 class="text-lg font-bold hidden sm:block" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
 							Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
@@ -823,10 +827,19 @@
 					<h2 class="text-lg font-semibold mb-4 text-white">Comments</h2>
 					{#each redditData.comments as comment}
 						{@const allComments = getAllComments(comment)}
-						{#each allComments as flatComment}
+						{#each allComments as flatComment, index}
 							{@const guessState = guessedComments.get(flatComment.id)}
-							<div class="comment mb-3 p-3 rounded-lg bg-gray-750" 
-								 style="margin-left: {flatComment.depth * 32}px"
+							{@const isReply = flatComment.depth > 0}
+							{@const hasReplies = flatComment.replies && flatComment.replies.length > 0}
+							{@const nextComment = allComments[index + 1]}
+							{@const nextIsTopLevel = nextComment && nextComment.depth === 0}
+							{@const nextIsSibling = nextComment && !nextIsTopLevel}
+							<div class="comment rounded-lg bg-gray-750 px-3 pt-3"
+								 class:pb-0={hasReplies}
+								 class:pb-1={!hasReplies && nextIsSibling}
+								 class:pb-3={!hasReplies && !nextIsSibling}
+								 class:mb-3={!nextComment || nextIsTopLevel}
+								 style="margin-left: {flatComment.depth * 48}px"
 								 data-comment-id={flatComment.id}>
 								<div class="border-l-2 pl-3" style="border-color: rgba(75, 85, 99, 0.4);">
 									<div class="text-sm text-gray-400 mb-2">
@@ -839,57 +852,56 @@
 									</div>
 									
 									{#if flatComment.content_html}
-										<div class="mb-3 prose prose-invert prose-sm max-w-none text-gray-200 content-text glitch-text break-words"
+										<div class:mb-3={!nextComment || nextIsTopLevel} class:mb-1={nextComment && !nextIsTopLevel}
+											 class="prose prose-invert prose-sm max-w-none text-gray-200 content-text glitch-text break-words"
 											 data-text={flatComment.content}>
 											{@html flatComment.content_html}
 										</div>
 									{:else}
-										<div class="mb-3 whitespace-pre-wrap text-gray-200 content-text glitch-text break-words"
+										<div class:mb-3={!nextComment || nextIsTopLevel} class:mb-1={nextComment && !nextIsTopLevel}
+											 class="whitespace-pre-wrap text-gray-200 content-text glitch-text break-words"
 											 data-text={flatComment.content}>
 											{flatComment.content}
 										</div>
 									{/if}
 
 									<!-- Guessing Interface -->
-									<div class="pt-2" style="border-top: 1px solid rgba(75, 85, 99, 0.3);">
+									<div class:pt-2={!isReply} class:pt-1={isReply} style="border-top: 1px solid rgba(75, 85, 99, 0.3);">
 										{#if !guessState?.guessed}
 											{@const isLocked = hasUnguessedReplies(flatComment, guessedComments)}
-											<div class="flex gap-3 items-center">
-												<span class="text-xs text-gray-400 hidden sm:inline">Origin:</span>
-												<button
-													class="px-2 py-1 text-white rounded text-xs transition-all duration-200"
-													class:cursor-pointer={!isLocked}
-													class:hover:scale-105={!isLocked}
-													class:hover:shadow-lg={!isLocked}
-													class:cursor-not-allowed={isLocked}
-													class:opacity-50={isLocked}
-													style="background: linear-gradient(135deg, #164e63, #0891b2); border: 1px solid rgba(0, 212, 255, 0.3);"
-													on:mouseenter={(e) => !isLocked && (e.target.style.boxShadow = '0 0 15px rgba(0, 212, 255, 0.4)')}
-													on:mouseleave={(e) => e.target.style.boxShadow = ''}
-													on:click={() => !isLocked && makeGuess(flatComment.id, 'reddit', flatComment.is_ai)}
-													disabled={isLocked}
-												>
-													Reddit
-												</button>
-												<button
-													class="px-2 py-1 text-white rounded text-xs transition-all duration-200"
-													class:cursor-pointer={!isLocked}
-													class:hover:scale-105={!isLocked}
-													class:hover:shadow-lg={!isLocked}
-													class:cursor-not-allowed={isLocked}
-													class:opacity-50={isLocked}
-													style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
-													on:mouseenter={(e) => !isLocked && (e.target.style.boxShadow = '0 0 15px var(--replicant-glow)')}
-													on:mouseleave={(e) => e.target.style.boxShadow = ''}
-													on:click={() => !isLocked && makeGuess(flatComment.id, 'replicant', flatComment.is_ai)}
-													disabled={isLocked}
-												>
-													Replicant
-												</button>
-												{#if isLocked}
+											{#if isLocked}
+												<!-- Locked state: show message only, reserve button height -->
+												<div class="flex gap-2 items-center" style="min-height: 28px;">
 													<span class="text-xs text-gray-500 italic">Identify replies first</span>
-												{/if}
-											</div>
+													<svg class="w-4 h-4" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+														<line x1="12" y1="5" x2="12" y2="19"></line>
+														<polyline points="19 12 12 19 5 12"></polyline>
+													</svg>
+												</div>
+											{:else}
+												<!-- Unlocked state: show buttons -->
+												<div class="flex gap-3 items-center">
+													<span class="text-xs text-gray-400 hidden sm:inline">Origin:</span>
+													<button
+														class="px-2 py-1 text-white rounded text-xs transition-all duration-200 cursor-pointer hover:scale-105 hover:shadow-lg"
+														style="background: linear-gradient(135deg, #164e63, #0891b2); border: 1px solid rgba(0, 212, 255, 0.3);"
+														on:mouseenter={(e) => (e.target.style.boxShadow = '0 0 15px rgba(0, 212, 255, 0.4)')}
+														on:mouseleave={(e) => e.target.style.boxShadow = ''}
+														on:click={() => makeGuess(flatComment.id, 'reddit', flatComment.is_ai)}
+													>
+														Reddit
+													</button>
+													<button
+														class="px-2 py-1 text-white rounded text-xs transition-all duration-200 cursor-pointer hover:scale-105 hover:shadow-lg"
+														style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+														on:mouseenter={(e) => (e.target.style.boxShadow = '0 0 15px var(--replicant-glow)')}
+														on:mouseleave={(e) => e.target.style.boxShadow = ''}
+														on:click={() => makeGuess(flatComment.id, 'replicant', flatComment.is_ai)}
+													>
+														Replicant
+													</button>
+												</div>
+											{/if}
 										{:else}
 											<!-- Desktop Layout -->
 											<div class="hidden sm:flex gap-3 items-center">
