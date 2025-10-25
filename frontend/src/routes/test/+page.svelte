@@ -666,14 +666,14 @@
 
 					<!-- Stats (fade in after loading) -->
 					{#if contentVisible && !loading}
-					<div class="flex items-center gap-4 md:gap-6 text-sm" transition:fade={{ duration: 800 }}>
-						<div class="flex items-center gap-2">
+					<div class="flex items-center gap-2 md:gap-6 text-sm" transition:fade={{ duration: 800 }}>
+						<div class="flex items-center gap-2 pr-2 md:pr-0">
 							<svg class="w-5 h-5" fill="none" stroke="#4ade80" stroke-width="3" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
 								<polyline points="20 6 9 17 4 12"></polyline>
 							</svg>
 							<span class="text-gray-300">{correctGuesses}</span>
 						</div>
-						<div class="flex items-center gap-2">
+						<div class="flex items-center gap-2 pr-2 md:pr-0">
 							<svg class="w-5 h-5" fill="none" stroke="#f87171" stroke-width="3" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
 								<line x1="18" y1="6" x2="6" y2="18"></line>
 								<line x1="6" y1="6" x2="18" y2="18"></line>
@@ -692,7 +692,8 @@
 								style="background: rgba(0, 212, 255, 0.2); color: #00d4ff; border: 1px solid rgba(0, 212, 255, 0.3);"
 								title="View your final results"
 							>
-								Review Results
+								<span class="md:hidden">Results</span>
+								<span class="hidden md:inline">Review Results</span>
 							</button>
 						{/if}
 						{#if totalGuessed > 0}
@@ -782,7 +783,7 @@
 							</div>
 						</div>
 					</div>
-					<h1 class="text-2xl font-bold mb-4" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">{redditData.post.title}</h1>
+					<h1 class="text-xl sm:text-2xl font-bold mb-4" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">{redditData.post.title}</h1>
 					{#if redditData.post.content}
 						<div class="text-gray-200 mb-4">
 							<div class="whitespace-pre-wrap content-text">

@@ -186,8 +186,29 @@ def generate_single_ai_comment(post_title: str, post_content: str, subreddit: st
                               anthropic_client: anthropic.Anthropic,
                               previously_generated: List[Comment] = None,
                               tyrell_agenda: str = "") -> Comment:
-    """Generate a single AI comment using a specific archetype"""
-    
+    """Generate a single AI comment using a specific archetype with retry logic for length"""
+
+    # Retry up to 3 times if comment is too long
+    for attempt in range(3):
+        result = _generate_single_ai_comment_attempt(
+            post_title, post_content, subreddit, real_comments, archetype_key,
+            anthropic_client, previously_generated, tyrell_agenda, attempt
+        )
+        if result is not None:
+            return result
+
+    print(f"Failed to generate valid comment after 3 attempts for {archetype_key}")
+    return None
+
+
+def _generate_single_ai_comment_attempt(post_title: str, post_content: str, subreddit: str,
+                              real_comments: List[Comment], archetype_key: str,
+                              anthropic_client: anthropic.Anthropic,
+                              previously_generated: List[Comment] = None,
+                              tyrell_agenda: str = "",
+                              attempt: int = 0) -> Comment:
+    """Single attempt at generating an AI comment"""
+
     # Sample a few real comments for context and length examples
     sample_comments = random.sample(real_comments, min(3, len(real_comments)))
 
@@ -334,11 +355,15 @@ CRITICAL REMINDERS:
             print(f"Malformed comment data: {comment_data}")
             return None
 
-        # Validate length against maximum
+        # Validate length against maximum (with 5-word buffer)
         word_count = len(comment_data['content'].split())
-        if word_count > max_allowed:
-            print(f"Comment too long ({word_count} words, maximum {max_allowed}), skipping...")
+        buffer = 5
+        if word_count > max_allowed + buffer:
+            words_over = word_count - max_allowed
+            print(f"Comment too long ({word_count} words, {words_over} over max {max_allowed}), attempt {attempt + 1}/3...")
             return None
+        elif word_count > max_allowed:
+            print(f"Comment slightly over ({word_count} words vs max {max_allowed}), accepting within buffer...")
 
         # Apply writing style formatting (post-processing)
         formatted_content = apply_writing_style_formatting(comment_data['content'], writing_style)
@@ -672,7 +697,31 @@ def generate_thread_reply(post_title: str, post_content: str, subreddit: str,
                          previously_generated: List[Comment] = None,
                          tyrell_agenda: str = "",
                          used_archetypes: List[str] = None) -> Comment:
-    """Generate a single AI reply to a specific comment using hybrid archetypes and realistic length"""
+    """Generate a single AI reply to a specific comment with retry logic for length"""
+
+    # Retry up to 3 times if reply is too long
+    for attempt in range(3):
+        result = _generate_thread_reply_attempt(
+            post_title, post_content, subreddit, thread_context, parent_comment,
+            anthropic_client, all_real_comments, previously_generated, tyrell_agenda,
+            used_archetypes, attempt
+        )
+        if result is not None:
+            return result
+
+    print(f"Failed to generate valid reply after 3 attempts")
+    return None
+
+
+def _generate_thread_reply_attempt(post_title: str, post_content: str, subreddit: str,
+                         thread_context: List[Comment], parent_comment: Comment,
+                         anthropic_client: anthropic.Anthropic,
+                         all_real_comments: List[Comment] = None,
+                         previously_generated: List[Comment] = None,
+                         tyrell_agenda: str = "",
+                         used_archetypes: List[str] = None,
+                         attempt: int = 0) -> Comment:
+    """Single attempt at generating a reply"""
 
     # Get all available archetypes and filter out already used ones
     available_archetypes = get_available_archetypes(subreddit)
@@ -848,11 +897,15 @@ CRITICAL REPLY REQUIREMENTS:
         if 'content' not in reply_data:
             raise ValueError("Missing required fields in response")
 
-        # Validate length against maximum
+        # Validate length against maximum (with 5-word buffer)
         word_count = len(reply_data['content'].split())
-        if word_count > max_allowed:
-            print(f"Reply too long ({word_count} words, maximum {max_allowed}), skipping...")
+        buffer = 5
+        if word_count > max_allowed + buffer:
+            words_over = word_count - max_allowed
+            print(f"Reply too long ({word_count} words, {words_over} over max {max_allowed}), attempt {attempt + 1}/3...")
             return None
+        elif word_count > max_allowed:
+            print(f"Reply slightly over ({word_count} words vs max {max_allowed}), accepting within buffer...")
 
         # Apply writing style formatting (post-processing)
         formatted_content = apply_writing_style_formatting(reply_data['content'], writing_style)
