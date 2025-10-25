@@ -22,8 +22,8 @@
 		transition:fade={{ duration: 200 }}
 	>
 		<div
-			class="max-w-2xl w-full border border-gray-700 rounded-lg p-8 relative"
-			style="background: rgba(17, 17, 20, 0.98);"
+			class="w-full border border-gray-700 rounded-lg p-8 relative"
+			style="background: rgba(17, 17, 20, 0.98); max-width: 722px;"
 			transition:scale={{ duration: 200, start: 0.95 }}
 		>
 			<!-- Close button -->
@@ -49,14 +49,14 @@
 			<div class="space-y-6 text-gray-200">
 				<div>
 					<p class="leading-relaxed">
-						The post below is real, pulled directly from Reddit — but it's been infiltrated by <span
-							class="font-bold text-red-500"
-							style="text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.6);"
-							>Replicants</span
-						>.
+						The post below is real, pulled directly from Reddit — but we've mixed AI-generated comments in among the real ones.
 					</p>
 					<p class="leading-relaxed mt-4">
-						Your goal: identify which comments are AI-generated (Replicant) and which are actually human (Reddit).
+						<strong>Your goal:</strong> identify which comments are AI-generated (<span
+							class="font-bold text-red-500"
+							style="text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.6);"
+							>Replicant</span
+						>) and which are from Reddit.
 					</p>
 				</div>
 

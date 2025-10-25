@@ -834,12 +834,13 @@
 							{@const nextComment = allComments[index + 1]}
 							{@const nextIsTopLevel = nextComment && nextComment.depth === 0}
 							{@const nextIsSibling = nextComment && !nextIsTopLevel}
+							{@const indentSize = typeof window !== 'undefined' && window.innerWidth < 640 ? 24 : 48}
 							<div class="comment rounded-lg bg-gray-750 px-3 pt-3"
 								 class:pb-0={hasReplies}
 								 class:pb-1={!hasReplies && nextIsSibling}
 								 class:pb-3={!hasReplies && !nextIsSibling}
 								 class:mb-3={!nextComment || nextIsTopLevel}
-								 style="margin-left: {flatComment.depth * 48}px"
+								 style="margin-left: {flatComment.depth * indentSize}px"
 								 data-comment-id={flatComment.id}>
 								<div class="border-l-2 pl-3" style="border-color: rgba(75, 85, 99, 0.4);">
 									<div class="text-sm text-gray-400 mb-2">
