@@ -802,7 +802,8 @@ CRITICAL REPLY REQUIREMENTS:
 - This is a REPLY to a specific comment, not a top-level comment
 - Match the tone and energy of the comment you're replying to
 - Make ONE point, not a comprehensive explanation
-- NEVER start with "u/username:" - jump straight into response"""
+- NEVER start with "u/username:" - jump straight into response
+- Don't start with 'Exactly' or other cliche agreement phrases like 'This' or 'Right?'"""
     
     try:
         response = anthropic_client.messages.create(

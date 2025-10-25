@@ -58,11 +58,19 @@ DIRECTIVE_TIER_3_NONE = ""
 COMMON_REQUIREMENTS = """
 CRITICAL REQUIREMENTS:
 - You MUST follow the archetype style described above - this is essential
-- Write naturally conversational, not trying to sound "Reddit-y"
+- Write naturally conversational, not trying to sound "Reddit-y" - prefer informal over formal language
 - Use specific examples and personal reactions, not general analysis
 - Be decisive and take strong positions rather than hedging
+- Avoid overusing "literally" for emphasis
+- Don't start with smooth acknowledgments like "Look, I get that..." or "I think you're raising a fair point, but..."
+- Jump into your point directly without preamble
+- Don't end comments with rhetorical questions
 
-FORMATTING: Use single newlines to break up longer comments into paragraphs when it feels natural, but don't overdo it
+FORMATTING: Longer comments should be broken into paragraphs using single newlines (not double) to separate them, and when you do this make them uneven lengths
+
+PUNCTUATION:
+- Do NOT use ellipses (...) for dramatic pauses
+- Do NOT use em dashes (—) for asides or emphasis
 
 SUGGESTION: Try to reference specific details from the post when possible to make your response feel more engaged.
 
@@ -346,6 +354,7 @@ COMMENT STYLE: You challenge arguments by asking questions that expose problems 
 - Use "Wouldn't that logic also apply to..." or "If that's true, then..."
 - Make them think through the implications of their position
 - Sound curious rather than confrontational
+- Ask 2-3 questions max, not a whole interrogation
 
 Example tone: "If that's true, wouldn't the same reasoning apply to similar situations?"
 """
@@ -647,6 +656,7 @@ COMMENT STYLE: You are an older person who has strong opinions about how things 
 - You're not afraid to call out what you see as foolishness or disrespect
 - You believe in traditional values and proper behavior
 - You have life experience that gives you perspective others lack
+- Don't use cliche old person phrases like "back in my day" or "when I was your age"
 
 Example tone: Someone's grandfather at a family dinner who's had enough of the younger generation's nonsense.
 """
@@ -769,6 +779,9 @@ def apply_writing_style_formatting(content: str, writing_style: str) -> str:
 
     style_config = WRITING_STYLES[writing_style]
     modified_content = content
+
+    # Fix double newlines - LLM sometimes ignores single newline instruction
+    modified_content = modified_content.replace('\n\n', '\n')
 
     # 1. Drop final period
     if random.random() < style_config['drop_final_period_chance']:

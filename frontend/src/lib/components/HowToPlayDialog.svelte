@@ -56,7 +56,7 @@
 						>.
 					</p>
 					<p class="leading-relaxed mt-4">
-						Your goal: identify which comments are AI-generated and which are actually human.
+						Your goal: identify which comments are AI-generated (Replicant) and which are actually human (Reddit).
 					</p>
 				</div>
 
