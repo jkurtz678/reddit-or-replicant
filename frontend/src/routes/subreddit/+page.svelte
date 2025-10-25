@@ -75,9 +75,9 @@
 					<!-- Header -->
 					<div class="text-center mb-12">
 						<!-- Tyrell Corporation Banner -->
-						<div class="mb-16 mt-4">
+						<div class="mb-8 sm:mb-16 mt-4">
 							<h1
-								class="text-3xl font-bold text-white mb-6"
+								class="text-2xl sm:text-3xl font-bold text-white mb-6"
 								style="text-shadow: 0 0 15px rgba(255, 255, 255, 0.4), 0 0 30px rgba(173, 216, 230, 0.2);"
 							>
 								The Tyrell Corporation's infiltration has begun
