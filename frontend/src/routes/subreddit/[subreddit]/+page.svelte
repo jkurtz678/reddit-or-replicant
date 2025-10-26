@@ -453,9 +453,9 @@
 										{#if !post.is_deleted}
 											<button
 												class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
-												style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
-												on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
-												on:mouseleave={(e) => e.target.style.boxShadow = ''}
+												style="background: linear-gradient(135deg, #7f1d1d, #ef4444); border: 1px solid #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);"
+												on:mouseenter={(e) => e.target.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.4)'}
+												on:mouseleave={(e) => e.target.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.2)'}
 												on:click|stopPropagation={() => playGame(post.id)}
 											>
 												{#if progressStatus === 'completed'}
@@ -521,7 +521,7 @@
 							<div class="sm:hidden">
 								<!-- Title spans full width -->
 								<div class="flex items-center gap-2 mb-3">
-									<h3 class="font-medium text-white text-lg">{post.title}</h3>
+									<h3 class="font-medium text-white text-base">{post.title}</h3>
 									{#if post.is_deleted}
 										<span class="px-2 py-1 text-xs rounded text-amber-200 bg-amber-900/30 border border-amber-700/50">
 											Deleted
@@ -555,9 +555,9 @@
 										{#if !post.is_deleted}
 											<button
 												class="px-3 py-1 text-white rounded text-sm transition-all duration-200 hover:scale-105 cursor-pointer"
-												style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
-												on:mouseenter={(e) => e.target.style.boxShadow = '0 0 15px var(--replicant-glow)'}
-												on:mouseleave={(e) => e.target.style.boxShadow = ''}
+												style="background: linear-gradient(135deg, #7f1d1d, #ef4444); border: 1px solid #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);"
+												on:mouseenter={(e) => e.target.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.4)'}
+												on:mouseleave={(e) => e.target.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.2)'}
 												on:click|stopPropagation={() => playGame(post.id)}
 											>
 												{#if progressStatus === 'completed'}

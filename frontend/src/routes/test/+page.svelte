@@ -895,9 +895,9 @@
 													</button>
 													<button
 														class="px-2 py-1 text-white rounded text-xs transition-all duration-200 cursor-pointer hover:scale-105 hover:shadow-lg"
-														style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
-														on:mouseenter={(e) => (e.target.style.boxShadow = '0 0 15px var(--replicant-glow)')}
-														on:mouseleave={(e) => e.target.style.boxShadow = ''}
+														style="background: linear-gradient(135deg, #7f1d1d, #ef4444); border: 1px solid #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);"
+														on:mouseenter={(e) => (e.target.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.4)')}
+														on:mouseleave={(e) => (e.target.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.2)')}
 														on:click={() => makeGuess(flatComment.id, 'replicant', flatComment.is_ai)}
 													>
 														Replicant

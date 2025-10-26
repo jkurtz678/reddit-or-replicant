@@ -119,10 +119,10 @@
 									<div class="mt-6">
 										<button
 											class="px-6 py-2 text-white rounded transition-all duration-200 hover:scale-105 cursor-pointer"
-											style="background: linear-gradient(135deg, var(--replicant-primary), var(--replicant-secondary)); border: 1px solid var(--replicant-border);"
+											style="background: linear-gradient(135deg, #7f1d1d, #ef4444); border: 1px solid #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);"
 											on:mouseenter={(e) =>
-												(e.target.style.boxShadow = '0 0 15px var(--replicant-glow)')}
-											on:mouseleave={(e) => (e.target.style.boxShadow = '')}
+												(e.target.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.4)')}
+											on:mouseleave={(e) => (e.target.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.2)')}
 										>
 											Enter Community
 										</button>
