@@ -13,7 +13,7 @@
 </script>
 
 <svelte:head>
-	<title>About - Reddit or Replicant</title>
+	<title>Reddit or Replicant</title>
 </svelte:head>
 
 <div class="min-h-screen text-gray-100 relative z-10">
@@ -21,13 +21,17 @@
 	<div class="fixed top-0 left-0 right-0 z-50 border-b border-gray-700" style="background: rgba(17, 17, 20, 0.95); backdrop-filter: blur(10px);">
 		<div class="max-w-4xl mx-auto px-4 md:px-0 py-3">
 			<div class="flex items-center justify-between">
-				<a href="/" class="text-lg font-bold cursor-pointer hover:text-blue-300 transition-colors" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
-					Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
-				</a>
 				<div class="flex items-center gap-4">
-					<a href="/subreddit" class="transition-colors text-sm" style="color: #00d4ff;" >
-						Play Game
+					<a href="/subreddit" class="transition-colors flex items-center gap-1" style="color: #00d4ff;" on:mouseenter={(e) => e.target.style.color='#33e0ff'} on:mouseleave={(e) => e.target.style.color='#00d4ff'}>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+							<line x1="19" y1="12" x2="5" y2="12"></line>
+							<polyline points="12 19 5 12 12 5"></polyline>
+						</svg>
+						Back
 					</a>
+					<h1 class="text-lg font-bold hidden sm:block" style="color: #f3f4f6; text-shadow: 0 0 8px rgba(0, 212, 255, 0.1);">
+						Reddit or <span class="glitch" data-text="Replicant">Replicant</span>?
+					</h1>
 				</div>
 			</div>
 		</div>
@@ -62,9 +66,13 @@
 						Reddit or Replicant demonstrates how difficult it is to tell what is real on the modern internet. What looks like genuine human discourse can no longer be trusted until platforms adopt new policies for verifying user identities and blocking AI generated content. To learn more and get involved in advancing bipartisan policy solutions to combat AI-generated misinformation, visit the <a href="https://bipartisanpolicy.org/project/artificial-intelligence/" class="underline transition-colors" style="color: #00d4ff;" target="_blank" rel="noopener noreferrer">Bipartisan Policy Center's AI research</a> and <a href="https://bipartisanpolicy.org/donation-impact/" class="underline transition-colors" style="color: #00d4ff;" target="_blank" rel="noopener noreferrer">support their advocacy work</a> for evidence-based regulations that can restore trust in our digital information environment.
 					</p>
 
+					<p class="pt-8 border-t border-gray-700 text-base text-gray-300">
+						This project was created by Jackson Kurtz, a software engineer based in Los Angeles. Please email <a href="mailto:reddit.or.replicant@gmail.com" class="underline transition-colors" style="color: #00d4ff;" on:mouseenter={(e) => e.target.style.color='#33e0ff'} on:mouseleave={(e) => e.target.style.color='#00d4ff'}>reddit.or.replicant@gmail.com</a> for any feedback, questions, or suggestions.
+					</p>
+
 					<!-- <p class="text-center pt-8">
-						<a 
-							href="/subreddit" 
+						<a
+							href="/subreddit"
 							class="px-8 py-4 text-white text-xl rounded transition-all duration-200 cursor-pointer hover:scale-105 font-semibold inline-block"
 							style="background: linear-gradient(135deg, var(--replicant-dark), var(--replicant-light)); border: 1px solid var(--replicant-border); box-shadow: 0 4px 15px var(--replicant-shadow);"
 							on:mouseenter={(e) => e.target.style.boxShadow = '0 6px 25px var(--replicant-glow)'}

@@ -319,7 +319,7 @@
 </script>
 
 <svelte:head>
-	<title>{getSubredditDisplayName(currentSubreddit)} - Reddit or Replicant</title>
+	<title>Reddit or Replicant</title>
 </svelte:head>
 
 <div class="min-h-screen text-gray-100 relative z-10">

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import "../app.css";
-	import favicon from '$lib/assets/favicon.svg';
 	import { onNavigate } from '$app/navigation';
 	import { onMount, onDestroy } from 'svelte';
 
@@ -47,7 +46,7 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
 	<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
 </svelte:head>

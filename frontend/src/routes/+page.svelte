@@ -208,6 +208,10 @@
 	});
 </script>
 
+<svelte:head>
+	<title>Reddit or Replicant</title>
+</svelte:head>
+
 <!-- Shader background canvas -->
 <!-- <canvas bind:this={canvas} class="fixed inset-0 w-full h-full" style="z-index: -1;"></canvas> -->
 
