@@ -75,7 +75,7 @@
 					<!-- Header -->
 					<div class="text-center mb-12">
 						<!-- Tyrell Corporation Banner -->
-						<div class="mb-8 sm:mb-16 mt-4">
+						<div class="mb-8 sm:mb-12 mt-4">
 							<h1
 								class="text-2xl sm:text-3xl font-bold text-white mb-6"
 								style="text-shadow: 0 0 15px rgba(255, 255, 255, 0.4), 0 0 30px rgba(173, 216, 230, 0.2);"
@@ -91,6 +91,12 @@
 									style="text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.6), 0 0 30px rgba(220, 38, 38, 0.4);"
 									>Replicants</span
 								> are now embedded within these communities
+							</p>
+							<p
+								class="text-gray-300 text-lg max-w-4xl mx-auto leading-relaxed mt-4"
+								style="text-shadow: 0 0 8px rgba(255, 255, 255, 0.1);"
+							>
+								See if you can spot the bot
 							</p>
 						</div>
 					</div>

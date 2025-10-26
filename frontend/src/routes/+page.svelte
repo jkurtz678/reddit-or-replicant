@@ -238,7 +238,7 @@
 				on:mouseenter={(e) => e.target.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.4)'}
 				on:mouseleave={(e) => e.target.style.boxShadow = '0 0 10px rgba(239, 68, 68, 0.2)'}
 			>
-				Take the Test
+				Take the Challenge
 			</button>
 		</div>
 	{/if}
