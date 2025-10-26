@@ -66,7 +66,7 @@
 						Reddit or Replicant demonstrates how difficult it is to tell what is real on the modern internet. What looks like genuine human discourse can no longer be trusted until platforms adopt new policies for verifying user identities and blocking AI generated content. To learn more and get involved in advancing bipartisan policy solutions to combat AI-generated misinformation, visit the <a href="https://bipartisanpolicy.org/project/artificial-intelligence/" class="underline transition-colors" style="color: #00d4ff;" target="_blank" rel="noopener noreferrer">Bipartisan Policy Center's AI research</a> and <a href="https://bipartisanpolicy.org/donation-impact/" class="underline transition-colors" style="color: #00d4ff;" target="_blank" rel="noopener noreferrer">support their advocacy work</a> for evidence-based regulations that can restore trust in our digital information environment.
 					</p>
 
-					<p class="pt-8 border-t border-gray-700 text-base text-gray-300">
+					<p class="pt-8 border-t border-gray-700 text-lg leading-relaxed content-text">
 						This project was created by Jackson Kurtz, a software engineer based in Los Angeles. Please email <a href="mailto:reddit.or.replicant@gmail.com" class="underline transition-colors" style="color: #00d4ff;" on:mouseenter={(e) => e.target.style.color='#33e0ff'} on:mouseleave={(e) => e.target.style.color='#00d4ff'}>reddit.or.replicant@gmail.com</a> for any feedback, questions, or suggestions.
 					</p>
 
