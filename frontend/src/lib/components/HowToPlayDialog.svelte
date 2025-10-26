@@ -55,7 +55,7 @@
 						<strong>Your goal:</strong> identify which comments are AI-generated (<span
 							class="font-bold text-red-500"
 							style="text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.6);"
-							>Replicant</span
+							>Replicants</span
 						>) and which are from Reddit.
 					</p>
 				</div>

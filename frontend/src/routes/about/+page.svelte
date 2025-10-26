@@ -48,7 +48,7 @@
 
 				<div class="space-y-8 text-gray-200 text-lg leading-relaxed content-text">
 					<p>
-						<a href="https://www.sciencedirect.com/science/article/pii/S2451958824001714" class="underline transition-colors" style="color: #00d4ff;" target="_blank" rel="noopener noreferrer">Recent</a> <a href="https://www.nature.com/articles/s41598-024-76218-y" class="underline transition-colors" style="color: #00d4ff;" target="_blank" rel="noopener noreferrer">studies</a> show that humans can barely distinguish social media content created by the latest AI generated models from real human-created content. The accessibility of this technology enables malicious actors to perform large-scale online manipulation. The platforms that dominate the internet refuse to adopt identity verification or other anti-bot countermeasures and instead continuously prioritize profits over protecting their users.
+						<a href="https://www.sciencedirect.com/science/article/pii/S2451958824001714" class="underline transition-colors" style="color: #00d4ff;" target="_blank" rel="noopener noreferrer">Recent</a> <a href="https://www.nature.com/articles/s41598-024-76218-y" class="underline transition-colors" style="color: #00d4ff;" target="_blank" rel="noopener noreferrer">studies</a> show that humans can barely distinguish social media content created by the latest generative AI models from real human-created content. The accessibility of this technology enables malicious actors to perform large-scale online manipulation. The platforms that dominate the internet refuse to adopt identity verification or other anti-bot countermeasures and instead continuously prioritize profits over protecting their users.
 					</p>
 
 					<p>
