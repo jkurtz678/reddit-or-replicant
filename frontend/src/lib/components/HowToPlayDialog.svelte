@@ -22,7 +22,7 @@
 		transition:fade={{ duration: 200 }}
 	>
 		<div
-			class="w-full border border-gray-700 rounded-lg p-8 relative"
+			class="w-full border border-gray-700 rounded-lg p-6 sm:p-8 relative"
 			style="background: rgba(17, 17, 20, 0.98); max-width: 722px;"
 			transition:scale={{ duration: 200, start: 0.95 }}
 		>

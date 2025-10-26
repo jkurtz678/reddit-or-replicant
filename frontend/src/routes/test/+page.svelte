@@ -733,7 +733,7 @@
 		{/if}
 
 		{#if redditData}
-		<div class="max-w-4xl mx-auto" style="background: rgba(17, 17, 20, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(55, 65, 81, 0.3); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);">
+		<div class="max-w-4xl mx-auto px-2 md:px-0" style="background: rgba(17, 17, 20, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(55, 65, 81, 0.3); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);">
 		{#if contentVisible}
 		<div transition:fade={{ duration: 1000 }}>
 			<!-- Post -->
@@ -786,7 +786,7 @@
 					<h1 class="text-xl sm:text-2xl font-bold mb-4" style="color: #f3f4f6; text-shadow: 0 0 12px rgba(0, 212, 255, 0.1);">{redditData.post.title}</h1>
 					{#if redditData.post.content}
 						<div class="text-gray-200 mb-4">
-							<div class="whitespace-pre-wrap content-text">
+							<div class="whitespace-pre-wrap content-text" style="word-break: break-word; overflow-wrap: break-word;">
 								{#if shouldTruncatePost(redditData.post.content) && !postExpanded}
 									{@html getTruncatedPost(redditData.post.content)}
 								{:else}
