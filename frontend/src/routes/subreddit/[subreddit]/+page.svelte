@@ -351,7 +351,7 @@
 
 	<!-- Content with top padding to account for fixed toolbar -->
 	<div class="pt-16">
-	<div class="container mx-auto p-8 md:px-0">
+	<div class="container mx-auto px-4 py-8 md:px-0">
 
 		<!-- Loading State (no fade) -->
 		{#if loading}
