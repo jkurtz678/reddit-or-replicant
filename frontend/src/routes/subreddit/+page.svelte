@@ -159,11 +159,11 @@
 					{#if !statsLoading && stats && stats.global.total_guesses > 0}
 						<div class="mt-16 max-w-3xl mx-auto text-center" transition:fade={{ duration: 1000, delay: 300 }}>
 							<p class="text-lg leading-relaxed text-gray-300 mb-2">
-								Replicants are only detected <span
+								Most users only detect <span
 									class="font-bold text-red-500 text-2xl"
 									style="text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.6);"
 									>{stats.global.replicant_detection_rate}%</span
-								> of the time
+								> of Replicants
 							</p>
 							<p class="text-lg leading-relaxed text-gray-300">
 								The rest remain hidden, distorting our social media communities

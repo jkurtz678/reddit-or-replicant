@@ -431,11 +431,11 @@
 		{#if subredditStats && subredditStats.total_guesses > 0}
 			<div class="max-w-4xl mx-auto mb-8">
 				<p class="text-base leading-relaxed text-gray-300">
-					Replicants are only detected <span
+					Most users only detect <span
 						class="font-bold text-red-500 text-lg"
 						style="text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.6);"
 						>{subredditStats.replicant_detection_rate}%</span
-					> of the time in this community
+					> of Replicants in this community
 				</p>
 			</div>
 		{/if}
