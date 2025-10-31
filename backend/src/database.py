@@ -516,6 +516,72 @@ def flag_comment_as_obvious(user_id: int, post_id: int, comment_id: str, force_t
         conn.commit()
         return cursor.rowcount > 0
 
+def get_aggregate_stats(force_turso: bool = None) -> Dict:
+    """Get aggregate statistics across all guesses"""
+    with get_db_connection(force_turso) as conn:
+        # Global stats - overall accuracy
+        global_stats = conn.execute("""
+            SELECT
+                COUNT(*) as total_guesses,
+                SUM(is_correct) as correct_guesses,
+                CAST(SUM(is_correct) AS FLOAT) / COUNT(*) * 100 as accuracy_percentage
+            FROM user_guesses
+            WHERE is_deleted = 0
+        """).fetchone()
+
+        # Replicant detection rate
+        # Total Replicants = correct replicant guesses + incorrect reddit guesses (missed replicants)
+        # Detected Replicants = correct replicant guesses
+        replicant_stats = conn.execute("""
+            SELECT
+                SUM(CASE WHEN guess = 'replicant' AND is_correct = 1 THEN 1 ELSE 0 END) as detected_replicants,
+                SUM(CASE WHEN (guess = 'replicant' AND is_correct = 1) OR (guess = 'reddit' AND is_correct = 0) THEN 1 ELSE 0 END) as total_replicants
+            FROM user_guesses
+            WHERE is_deleted = 0
+        """).fetchone()
+
+        replicant_detection_rate = 0
+        if replicant_stats[1] and replicant_stats[1] > 0:
+            replicant_detection_rate = (replicant_stats[0] / replicant_stats[1]) * 100
+
+        # Per-subreddit stats
+        subreddit_stats = conn.execute("""
+            SELECT
+                p.subreddit,
+                COUNT(ug.id) as total_guesses,
+                SUM(ug.is_correct) as correct_guesses,
+                CAST(SUM(ug.is_correct) AS FLOAT) / COUNT(ug.id) * 100 as accuracy_percentage,
+                SUM(CASE WHEN ug.guess = 'replicant' AND ug.is_correct = 1 THEN 1 ELSE 0 END) as detected_replicants,
+                SUM(CASE WHEN (ug.guess = 'replicant' AND ug.is_correct = 1) OR (ug.guess = 'reddit' AND ug.is_correct = 0) THEN 1 ELSE 0 END) as total_replicants
+            FROM user_guesses ug
+            JOIN posts p ON ug.post_id = p.id
+            WHERE ug.is_deleted = 0
+            GROUP BY p.subreddit
+        """).fetchall()
+
+        return {
+            "global": {
+                "total_guesses": global_stats[0],
+                "correct_guesses": global_stats[1],
+                "accuracy_percentage": round(global_stats[2], 1) if global_stats[2] else 0,
+                "replicant_detection_rate": round(replicant_detection_rate, 1),
+                "detected_replicants": replicant_stats[0] or 0,
+                "total_replicants": replicant_stats[1] or 0
+            },
+            "by_subreddit": [
+                {
+                    "subreddit": row[0],
+                    "total_guesses": row[1],
+                    "correct_guesses": row[2],
+                    "accuracy_percentage": round(row[3], 1) if row[3] else 0,
+                    "replicant_detection_rate": round((row[4] / row[5] * 100), 1) if row[5] and row[5] > 0 else 0,
+                    "detected_replicants": row[4] or 0,
+                    "total_replicants": row[5] or 0
+                }
+                for row in subreddit_stats
+            ]
+        }
+
 # Evaluation functions
 
 def save_evaluation_result(post_id: int, mixed_reality_score: float, diversity_score: float,

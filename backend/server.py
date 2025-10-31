@@ -15,7 +15,7 @@ from src.reddit_fetcher import fetch_reddit_post, extract_post_info, validate_re
 from src.database import (
     save_post, get_post_by_id, get_all_posts, get_posts_by_subreddit, post_exists, soft_delete_post, restore_post,
     get_or_create_user, save_user_guess, get_user_progress, get_user_all_progress, reset_user_progress,
-    save_evaluation_result, flag_comment_as_obvious
+    save_evaluation_result, flag_comment_as_obvious, get_aggregate_stats
 )
 import anthropic
 from src.gen.generate_mixed_comments import (
@@ -641,6 +641,13 @@ def get_test_reddit_raw():
     with open(json_file_path, "r") as file:
         data = json.load(file)
     return data
+
+@app.get("/api/stats")
+def get_stats(x_admin_env: str = Header(None)):
+    """Get aggregate statistics for all guesses"""
+    force_turso = parse_admin_environment(x_admin_env)
+    stats = get_aggregate_stats(force_turso=force_turso)
+    return stats
 
 @app.get("/api/mixed-comments/{post_id}")
 def get_mixed_comments(post_id: int, x_admin_env: str = Header(None)):

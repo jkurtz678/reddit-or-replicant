@@ -49,6 +49,7 @@
 	let progressLoaded = false;
 	let currentSubreddit = '';
 	let openDropdownId: number | null = null;
+	let subredditStats: { replicant_detection_rate: number; total_guesses: number } | null = null;
 	let contentVisible = false;
 
 	// Get subreddit from URL params
@@ -130,6 +131,27 @@
 		}
 	}
 
+	async function loadStats() {
+		try {
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/stats`, {
+				headers: databaseManager.getHeaders()
+			});
+			if (response.ok) {
+				const data = await response.json();
+				// Find stats for current subreddit
+				const subredditData = data.by_subreddit.find((s: any) => s.subreddit === currentSubreddit);
+				if (subredditData) {
+					subredditStats = {
+						replicant_detection_rate: subredditData.replicant_detection_rate,
+						total_guesses: subredditData.total_guesses
+					};
+				}
+			}
+		} catch (err) {
+			console.error('Error loading stats:', err);
+		}
+	}
+
 	async function loadAllData() {
 		if (!currentSubreddit || !browser || !anonymousUserId) return;
 
@@ -137,10 +159,11 @@
 			loading = true;
 			error = '';
 
-			// Run both API calls in parallel
+			// Run all API calls in parallel
 			const [postsData, progressData] = await Promise.all([
 				loadPosts(),
-				loadUserProgress()
+				loadUserProgress(),
+				loadStats()
 			]);
 
 			// Update state only after both complete successfully
@@ -401,6 +424,19 @@
 						</button>
 					{/if}
 				</div>
+			</div>
+		{/if}
+
+		<!-- Subreddit Stats -->
+		{#if subredditStats && subredditStats.total_guesses > 0}
+			<div class="max-w-4xl mx-auto mb-8">
+				<p class="text-base leading-relaxed text-gray-300">
+					Replicants are only detected <span
+						class="font-bold text-red-500 text-lg"
+						style="text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.6);"
+						>{subredditStats.replicant_detection_rate}%</span
+					> of the time in this community
+				</p>
 			</div>
 		{/if}
 

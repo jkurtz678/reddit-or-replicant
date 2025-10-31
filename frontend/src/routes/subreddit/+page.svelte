@@ -2,14 +2,31 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
+	import { databaseManager } from '$lib/environment';
 
 	let contentVisible = false;
+	let stats: { global: { accuracy_percentage: number; total_guesses: number } } | null = null;
+	let statsLoading = true;
 
-	onMount(() => {
+	onMount(async () => {
 		// Trigger fade-in animation
 		setTimeout(() => {
 			contentVisible = true;
 		}, 100);
+
+		// Fetch stats
+		try {
+			const response = await fetch(`${databaseManager.getApiUrl()}/api/stats`, {
+				headers: databaseManager.getHeaders()
+			});
+			if (response.ok) {
+				stats = await response.json();
+			}
+		} catch (error) {
+			console.error('Failed to fetch stats:', error);
+		} finally {
+			statsLoading = false;
+		}
 	});
 
 	// Hardcoded subreddits with descriptions
@@ -96,7 +113,7 @@
 								class="text-gray-300 text-lg max-w-4xl mx-auto leading-relaxed mt-4"
 								style="text-shadow: 0 0 8px rgba(255, 255, 255, 0.1);"
 							>
-								See if you can spot the bot
+								See if you can separate human from AI
 							</p>
 						</div>
 					</div>
@@ -137,6 +154,22 @@
 							</div>
 						{/each}
 					</div>
+
+					<!-- Global Stats Section -->
+					{#if !statsLoading && stats && stats.global.total_guesses > 0}
+						<div class="mt-16 max-w-3xl mx-auto text-center" transition:fade={{ duration: 1000, delay: 300 }}>
+							<p class="text-lg leading-relaxed text-gray-300 mb-2">
+								Replicants are only detected <span
+									class="font-bold text-red-500 text-2xl"
+									style="text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.6);"
+									>{stats.global.replicant_detection_rate}%</span
+								> of the time
+							</p>
+							<p class="text-lg leading-relaxed text-gray-300">
+								The rest remain hidden, distorting our social media communities
+							</p>
+						</div>
+					{/if}
 				</div>
 			</div>
 		{/if}
